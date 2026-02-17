@@ -1,4 +1,4 @@
-# Faith-Fueled Fitness (FFF) App
+# Faith-Fueled Fitness (FFF) App (University Final Year Computing Project)
 
 Mobile fitness app integrating workouts, nutrition tracking, health metrics, and faith-based motivation.
 

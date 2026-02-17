@@ -1,23 +1,7 @@
 # Faith-Fueled Fitness (FFF) App
-Mobile fitness app integrating workouts, nutrition tracking, health metrics, and faith-based motivation.
-## í¾¥ Demo
-**[Watch Demo Video](#)** _(Coming soon_
-**Screenshots:**
-| Dashboard | Exercise Search | Nutrition Tracking |
-|-----------|----------------|-------------------|
-| ![Dashboard](screenshots/dashboard.png) | ![Exercise](screenshots/exercise.png) | ![Nutrition](screenshots/nutrition.png) |
 
-## Tech Stack
-- **Frontend**: React Native (Expo)
-- **Backend**: Node.js + Express
-- **Database**: MongoDB Atlas
-- **State**: Redux Toolkit
-- **Navigation**: React Navigation
-## Key Features
-cat > README.md << 'EOF'
-# Faith-Fueled Fitness (FFF) App
 Mobile fitness app integrating workouts, nutrition tracking, health metrics, and faith-based motivation.
-## í¾¥ Demo
+## ï¿½ï¿½ï¿½ Demo
 **[Watch Demo Video](#)** _(Coming soon_
 **Screenshots:**
 | Dashboard | Exercise Search | Nutrition Tracking |

@@ -47,22 +47,24 @@ export const ProfileScreen = ({ navigation }: any) => {
   };
 
   const handleLogout = () => {
-    Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Logout',
-          style: 'destructive',
-          onPress: () => {
-            logout();
-            // Navigation will be handled by AuthContext
-          }
+  Alert.alert(
+    'Logout',
+    'Are you sure you want to logout?',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Logout',
+        style: 'destructive',
+        onPress: async () => {
+          console.log('User confirmed logout');
+          await logout();
+          console.log('Logout completed');
+          // Navigation will automatically happen because user becomes null
         }
-      ]
-    );
-  };
+      }
+    ]
+  );
+};
 
   const getDaysActive = () => {
     if (!stats) return 0;

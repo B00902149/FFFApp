@@ -6,7 +6,7 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   Alert,
-  ActivityIndicator 
+  ActivityIndicator,
 } from 'react-native';
 import { colors, spacing, borderRadius } from '../theme/colors';
 import { authAPI } from '../services/api';
@@ -14,6 +14,11 @@ import { useAuth } from '../context/AuthContext';
 
 export const LoginScreen = ({ navigation }: any) => {
   const { login: saveAuth } = useAuth();
+  
+  // Check if navigation exists
+  React.useEffect(() => {
+    console.log('LoginScreen - navigation exists?', !!navigation);
+  }, []);
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [username, setUsername] = useState('');
@@ -28,40 +33,37 @@ export const LoginScreen = ({ navigation }: any) => {
 
   setLoading(true);
   console.log('=== LOGIN ATTEMPT ===');
-  console.log('Email:', email);
   
   try {
-    console.log('Calling authAPI.login...');
-    const data = await authAPI.login(email, password);
-    
-    console.log('Received data:', JSON.stringify(data, null, 2));
-    console.log('Token exists?', !!data?.token);
-    console.log('User exists?', !!data?.user);
+    const data = await authAPI.login(email.toLowerCase().trim(), password);
     
     if (data?.token && data?.user) {
-      console.log('Token:', data.token.substring(0, 20) + '...');
-      console.log('User:', data.user);
+      const userData = {
+        id: data.user._id || data.user.id,
+        username: data.user.username,
+        email: data.user.email
+      };
       
-      await saveAuth(data.token, data.user);
-      Alert.alert('Success', 'Welcome back!');
-      navigation.navigate('Main');
+      // Save auth
+      await saveAuth(userData, data.token);
+      
+      console.log('✅ Login successful!');
+      
+      // REMOVE THIS - it causes the error:
+      // navigation.dispatch(...)
+      
+      // Navigation will happen automatically when user state changes
     } else {
-      console.error('Missing token or user in response');
-      console.error('Full response:', data);
       Alert.alert('Error', 'Server response was incomplete');
     }
   } catch (err: any) {
-    console.error('=== LOGIN ERROR ===');
-    console.error('Error type:', typeof err);
-    console.error('Error:', err);
-    console.error('Error message:', err?.error || err?.message);
-    
-    const message = err?.error || err?.message || 'Login failed - check backend';
-    Alert.alert('Error', message);
+    console.error('Login error:', err);
+    Alert.alert('Login Failed', err?.error || err?.message || 'Login failed');
   } finally {
     setLoading(false);
   }
 };
+
   const handleSignUp = async () => {
     if (!email || !username || !password) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -74,14 +76,37 @@ export const LoginScreen = ({ navigation }: any) => {
     }
 
     setLoading(true);
+    console.log('=== SIGNUP ATTEMPT ===');
+    
     try {
-      await authAPI.register(email, username, password);
-      Alert.alert('Success', 'Account created! Now please log in.');
-      setIsSignUp(false);
-      setPassword('');
+      const data = await authAPI.register(username.trim(), email.toLowerCase().trim(), password);
+      
+      console.log('Registration successful:', data);
+      
+      if (data?.token && data?.user) {
+        // Prepare user data
+        const userData = {
+          id: data.user._id || data.user.id,
+          username: data.user.username,
+          email: data.user.email
+        };
+        
+        // CORRECT ORDER: user first, token second
+        await saveAuth(userData, data.token);
+        
+        Alert.alert('Success', 'Account created successfully!');
+        console.log('✅ Registration and login successful!');
+      } else {
+        Alert.alert('Success', 'Account created! Please log in.');
+        setIsSignUp(false);
+        setPassword('');
+      }
     } catch (err: any) {
+      console.error('=== SIGNUP ERROR ===');
+      console.error('Error:', err);
+      
       const message = err?.error || err?.message || 'Registration failed';
-      Alert.alert('Error', message);
+      Alert.alert('Registration Failed', message);
     } finally {
       setLoading(false);
     }

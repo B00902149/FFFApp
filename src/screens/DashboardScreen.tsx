@@ -37,21 +37,7 @@ export const DashboardScreen = ({ navigation }: any) => {
   ];
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.userInfo}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>👤</Text>
-          </View>
-          <Text style={styles.username}>Welcome!</Text>
-        </View>
-        <TouchableOpacity style={styles.notification}>
-          <Text style={styles.notificationIcon}>🔔</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         {/* Daily Verse */}
         <View style={styles.verseCard}>
           <Text style={styles.verseLabel}>Daily Verse</Text>
@@ -83,7 +69,6 @@ export const DashboardScreen = ({ navigation }: any) => {
           </Text>
         </View>
       </ScrollView>
-    </View>
   );
 };
 
@@ -92,50 +77,15 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.primary.dark
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.lg,
-    paddingTop: 60
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm
-  },
-  avatarText: {
-    fontSize: 20
-  },
-  username: {
-    color: colors.text.white,
-    fontSize: 16,
-    fontWeight: '600'
-  },
-  notification: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  notificationIcon: {
-    fontSize: 24
-  },
   scrollView: {
-    flex: 1
+    flex: 1,
+    backgroundColor: colors.primary.dark
   },
   content: {
-    padding: spacing.lg,
-    paddingBottom: 100
-  },
+  padding: spacing.lg,
+  paddingTop: spacing.md,  // Less padding since header is gone
+  paddingBottom: 40  // Reduced since no bottom tabs
+},
   verseCard: {
     backgroundColor: 'rgba(255,255,255,0.95)',
     borderRadius: borderRadius.medium,
@@ -199,16 +149,19 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   },
   quoteCard: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderRadius: borderRadius.medium,
-    padding: spacing.lg,
-    marginBottom: spacing.xl
+  backgroundColor: 'rgba(255,255,255,0.15)',  // Change from 0.1 to 0.15 for more visibility
+  borderRadius: borderRadius.medium,
+  padding: spacing.lg,
+  marginBottom: spacing.xl,
+  borderWidth: 1,  // Add border
+  borderColor: 'rgba(255,255,255,0.2)'  // Add border color
   },
   quote: {
-    fontSize: 16,
-    fontStyle: 'italic',
-    color: colors.text.white,
-    textAlign: 'center',
-    lineHeight: 24
+  fontSize: 16,
+  fontStyle: 'italic',
+  color: colors.text.white,  // Make sure it's white
+  textAlign: 'center',
+  lineHeight: 24,
+  fontWeight: '500'  // Add weight for better visibility
   }
 });

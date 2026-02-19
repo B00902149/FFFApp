@@ -20,6 +20,10 @@ import { PostDetailScreen } from '../screens/PostDetailScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
 import { useAuth } from '../context/AuthContext';
 import { colors } from '../theme/colors';
+import { ProgressChartsScreen } from '../screens/ProgressChartsScreen';
+import { WeeklyNutritionScreen } from '../screens/WeeklyNutritionScreen';
+
+
 
 const Stack = createNativeStackNavigator();
 const Tab = createNativeStackNavigator();
@@ -155,6 +159,8 @@ export const AppNavigator = () => {
             <Stack.Screen name="CreatePost" component={CreatePostScreen} />
             <Stack.Screen name="PostDetail" component={PostDetailScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+            <Stack.Screen name="ProgressCharts" component={ProgressChartsScreen} />
+            <Stack.Screen name="WeeklyNutrition" component={WeeklyNutritionScreen} />
           </>
         ) : (
           // User is not logged in - show only login

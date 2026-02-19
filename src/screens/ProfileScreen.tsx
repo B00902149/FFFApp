@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, RefreshControl, Image} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { colors, spacing, borderRadius } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
-import { profileAPI } from '../services/api';
+import { profileAPI, workoutAPI } from '../services/api';
 
 export const ProfileScreen = ({ navigation }: any) => {
   const { user, logout } = useAuth();
   
   const [profile, setProfile] = useState<any>(null);
   const [stats, setStats] = useState<any>(null);
+  const [streak, setStreak] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -28,6 +29,9 @@ export const ProfileScreen = ({ navigation }: any) => {
       
       setProfile(profileData);
       setStats(statsData);
+      
+      // Calculate streak after loading profile
+      await calculateStreak();
     } catch (error) {
       console.error('Failed to load profile:', error);
       Alert.alert('Error', 'Failed to load profile data');
@@ -36,6 +40,89 @@ export const ProfileScreen = ({ navigation }: any) => {
       setRefreshing(false);
     }
   };
+
+  const calculateStreak = async () => {
+  try {
+    if (!user?.id) return;
+
+    // Get workouts - handle response properly
+    const response = await workoutAPI.getWorkouts(user.id);
+    
+    // Extract workouts array from response
+    const workouts = Array.isArray(response) ? response : (response?.workouts || []);
+    
+    console.log('Workouts loaded:', workouts.length);
+
+    // If no workouts at all, streak is 0
+    if (!workouts || workouts.length === 0) {
+      console.log('No workouts found');
+      setStreak(0);
+      return;
+    }
+
+    // Calculate consecutive days with completed workouts
+    let currentStreak = 0;
+    let checkDate = new Date();
+    checkDate.setHours(0, 0, 0, 0);
+
+    // Check if there's a workout today or yesterday
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+    
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const yesterdayStr = yesterday.toISOString().split('T')[0];
+
+    const hasTodayWorkout = workouts.some((w: any) => {
+      if (!w) return false;
+      const workoutDate = new Date(w.completedAt || w.createdAt).toISOString().split('T')[0];
+      return workoutDate === todayStr && w.isCompleted;
+    });
+
+    const hasYesterdayWorkout = workouts.some((w: any) => {
+      if (!w) return false;
+      const workoutDate = new Date(w.completedAt || w.createdAt).toISOString().split('T')[0];
+      return workoutDate === yesterdayStr && w.isCompleted;
+    });
+
+    console.log('Has today workout:', hasTodayWorkout);
+    console.log('Has yesterday workout:', hasYesterdayWorkout);
+
+    // If no workout today or yesterday, streak is 0
+    if (!hasTodayWorkout && !hasYesterdayWorkout) {
+      console.log('No recent workouts - streak is 0');
+      setStreak(0);
+      return;
+    }
+
+    // Count consecutive days backwards
+    while (true) {
+      const dateStr = checkDate.toISOString().split('T')[0];
+      const hasWorkout = workouts.some((w: any) => {
+        if (!w) return false;
+        const workoutDate = new Date(w.completedAt || w.createdAt).toISOString().split('T')[0];
+        return workoutDate === dateStr && w.isCompleted;
+      });
+
+      if (hasWorkout) {
+        currentStreak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        break;
+      }
+
+      // Safety limit: max 365 days
+      if (currentStreak > 365) break;
+    }
+
+    console.log('✅ Workout streak calculated:', currentStreak);
+    setStreak(currentStreak);
+  } catch (error) {
+    console.error('Calculate streak error:', error);
+    setStreak(0);
+  }
+};
 
   const handleEditProfile = () => {
     navigation.navigate('EditProfile', {
@@ -55,9 +142,10 @@ export const ProfileScreen = ({ navigation }: any) => {
         {
           text: 'Logout',
           style: 'destructive',
-          onPress: () => {
-            logout();
-            // Navigation will be handled by AuthContext
+          onPress: async () => {
+            console.log('User confirmed logout');
+            await logout();
+            console.log('Logout completed');
           }
         }
       ]
@@ -72,16 +160,15 @@ export const ProfileScreen = ({ navigation }: any) => {
   const getBMI = () => {
     if (!profile?.currentWeight || !profile?.height) return null;
     
-    // Convert to metric if needed
     let weight = profile.currentWeight;
     let height = profile.height;
     
     if (profile.weightUnit === 'lbs') {
-      weight = weight * 0.453592; // Convert to kg
+      weight = weight * 0.453592;
     }
     
     if (profile.heightUnit === 'inches') {
-      height = height * 2.54; // Convert to cm
+      height = height * 2.54;
     }
     
     const heightInMeters = height / 100;
@@ -90,11 +177,29 @@ export const ProfileScreen = ({ navigation }: any) => {
     return bmi.toFixed(1);
   };
 
+  const getStreakMessage = () => {
+    if (streak === 0) return 'Start Today!';
+    if (streak === 1) return 'Great Start!';
+    if (streak < 7) return 'Keep Going!';
+    if (streak < 30) return 'On Fire! 🔥';
+    return 'Legendary! 🏆';
+  };
+
+  const getStreakColor = () => {
+    if (streak === 0) return colors.text.secondary;
+    if (streak < 7) return colors.accent.blue;
+    if (streak < 30) return colors.accent.red;
+    return colors.accent.green;
+  };
+
   if (loading) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Profile</Text>
+          <TouchableOpacity onPress={handleLogout}>
+            <Text style={styles.logoutButton}>Logout</Text>
+          </TouchableOpacity>
         </View>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.accent.blue} />
@@ -155,6 +260,20 @@ export const ProfileScreen = ({ navigation }: any) => {
           >
             <Text style={styles.editButtonText}>Edit Profile</Text>
           </TouchableOpacity>
+        </View>
+
+        {/* Workout Streak Card */}
+        <View style={[styles.streakCard, { borderLeftColor: getStreakColor() }]}>
+          <Text style={styles.streakIcon}>🔥</Text>
+          <View style={styles.streakContent}>
+            <Text style={styles.streakValue}>
+              {streak} Day{streak !== 1 ? 's' : ''}
+            </Text>
+            <Text style={styles.streakLabel}>Workout Streak</Text>
+          </View>
+          <View style={[styles.streakBadge, { backgroundColor: getStreakColor() }]}>
+            <Text style={styles.streakBadgeText}>{getStreakMessage()}</Text>
+          </View>
         </View>
 
         {/* Stats Grid */}
@@ -269,13 +388,13 @@ export const ProfileScreen = ({ navigation }: any) => {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => navigation.navigate('Nutrition')}
-          >
-            <Text style={styles.actionIcon}>🍎</Text>
-            <Text style={styles.actionText}>Log Nutrition</Text>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
+  style={styles.actionButton}
+  onPress={() => navigation.navigate('WeeklyNutrition')}
+>
+  <Text style={styles.actionIcon}>🍎</Text>
+  <Text style={styles.actionText}>Weekly Nutrition</Text>
+  <Text style={styles.actionArrow}>›</Text>
+</TouchableOpacity>
 
           <TouchableOpacity 
             style={styles.actionButton}
@@ -283,6 +402,15 @@ export const ProfileScreen = ({ navigation }: any) => {
           >
             <Text style={styles.actionIcon}>💬</Text>
             <Text style={styles.actionText}>View Community</Text>
+            <Text style={styles.actionArrow}>›</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation.navigate('ProgressCharts')}
+          >
+            <Text style={styles.actionIcon}>📈</Text>
+            <Text style={styles.actionText}>Progress Charts</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
         </View>
@@ -296,7 +424,7 @@ export const ProfileScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.primary.dark  // Changed from lightGray
+    backgroundColor: colors.primary.dark
   },
   header: {
     flexDirection: 'row',
@@ -305,24 +433,33 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: 50,
     paddingBottom: spacing.md,
-    backgroundColor: colors.primary.dark,  // Changed from white
+    backgroundColor: colors.primary.dark,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)'  // Changed
+    borderBottomColor: 'rgba(255,255,255,0.1)'
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.text.white  // Changed from primary
+    color: colors.text.white
   },
   logoutButton: {
     fontSize: 16,
     color: colors.accent.red,
     fontWeight: '600'
   },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  loadingText: {
+    marginTop: spacing.md,
+    fontSize: 16,
+    color: colors.text.secondary
+  },
   content: {
     flex: 1
   },
-  // Profile header stays white for contrast
   profileHeader: {
     backgroundColor: 'rgba(255,255,255,0.95)',
     alignItems: 'center',
@@ -339,7 +476,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent.blue + '20',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.md
+    marginBottom: spacing.md,
+    overflow: 'hidden'
   },
   avatarLargeText: {
     fontSize: 48
@@ -375,12 +513,56 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600'
   },
+  // Streak Card Styles
+  streakCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    padding: spacing.lg,
+    borderRadius: borderRadius.medium,
+    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3
+  },
+  streakIcon: {
+    fontSize: 40,
+    marginRight: spacing.md
+  },
+  streakContent: {
+    flex: 1
+  },
+  streakValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.text.primary
+  },
+  streakLabel: {
+    fontSize: 14,
+    color: colors.text.secondary
+  },
+  streakBadge: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.small
+  },
+  streakBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.text.white
+  },
   statsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     padding: spacing.sm,
-    backgroundColor: colors.background.white,
-    marginBottom: spacing.sm
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    marginBottom: spacing.sm,
+    marginHorizontal: spacing.lg,
+    borderRadius: borderRadius.medium
   },
   statCard: {
     width: '50%',
@@ -399,9 +581,11 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   },
   section: {
-    backgroundColor: colors.background.white,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     padding: spacing.lg,
-    marginBottom: spacing.sm
+    marginBottom: spacing.sm,
+    marginHorizontal: spacing.lg,
+    borderRadius: borderRadius.medium
   },
   sectionTitle: {
     fontSize: 18,
@@ -470,7 +654,7 @@ const styles = StyleSheet.create({
   },
   faithCard: {
     flexDirection: 'row',
-    backgroundColor: colors.accent.blue + '15',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     marginHorizontal: spacing.lg,
     marginBottom: spacing.sm,
     padding: spacing.lg,
@@ -488,12 +672,12 @@ const styles = StyleSheet.create({
   faithTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text.white,
+    color: 'rgba(255,255,255,0.8)',
     marginBottom: 4
   },
   faithText: {
     fontSize: 16,
-    color: colors.text.secondary,
+    color: colors.text.white,
     fontWeight: '600'
   },
   actionButton: {
@@ -519,15 +703,5 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 100
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  loadingText: {
-    marginTop: spacing.md,
-    fontSize: 16,
-    color: colors.text.secondary
   }
 });

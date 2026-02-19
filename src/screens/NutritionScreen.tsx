@@ -177,8 +177,13 @@ export const NutritionScreen = ({ navigation }: any) => {
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Nutrition</Text>
-        <View style={styles.placeholder} />
-      </View>
+         <TouchableOpacity 
+            style={styles.weeklyButton}
+            onPress={() => navigation.navigate('WeeklyNutrition')}
+          >
+            <Text style={styles.weeklyButtonText}>📊</Text>
+          </TouchableOpacity>
+        </View>
 
       {/* Date Navigator */}
       <View style={styles.dateNav}>
@@ -311,6 +316,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)'
   },
+  weeklyButton: {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  backgroundColor: 'rgba(255,255,255,0.2)',
+  alignItems: 'center',
+  justifyContent: 'center'
+},
+weeklyButtonText: {
+  fontSize: 20
+},
   backButton: {
     width: 40,
     height: 40,

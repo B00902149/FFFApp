@@ -324,4 +324,46 @@ export const profileAPI = {
   }
 };
 
+// Upload API
+export const uploadAPI = {
+  // Upload profile picture
+  uploadProfilePicture: async (userId: string, imageData: string) => {
+    try {
+      const response = await api.post('/upload/profile-picture', {
+        userId,
+        imageData
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Upload profile picture error:', error);
+      throw error.response?.data || { error: 'Failed to upload profile picture' };
+    }
+  },
+
+  // Remove profile picture
+  removeProfilePicture: async (userId: string) => {
+    try {
+      const response = await api.delete(`/upload/profile-picture/${userId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Remove profile picture error:', error);
+      throw error.response?.data || { error: 'Failed to remove profile picture' };
+    }
+  },
+
+  // Upload workout photo
+  uploadWorkoutPhoto: async (workoutId: string, imageData: string) => {
+    try {
+      const response = await api.post('/upload/workout-photo', {
+        workoutId,
+        imageData
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Upload workout photo error:', error);
+      throw error.response?.data || { error: 'Failed to upload workout photo' };
+    }
+  }
+};
+
 export default api;

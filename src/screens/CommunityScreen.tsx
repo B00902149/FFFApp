@@ -260,7 +260,7 @@ export const CommunityScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.lightGray
+    backgroundColor: '#001F3F'
   },
   header: {
     flexDirection: 'row',
@@ -269,27 +269,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: 50,
     paddingBottom: spacing.md,
-    backgroundColor: colors.background.white,
+    backgroundColor: '#001F3F',
     borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
+    borderBottomColor: 'rgba(255,255,255,0.1)'
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.accent.blue + '15',
+    backgroundColor: colors.accent.blue,
     alignItems: 'center',
     justifyContent: 'center'
   },
   backIcon: {
     fontSize: 24,
-    color: colors.accent.blue,
+    color: colors.text.white,
     fontWeight: 'bold'
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.text.primary,
+    color: colors.text.white,
     flex: 1,
     textAlign: 'center'
   },
@@ -322,10 +322,10 @@ const styles = StyleSheet.create({
   },
   faithBanner: {
     flexDirection: 'row',
-    backgroundColor: colors.accent.blue + '15',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     padding: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
+    borderBottomColor: 'rgba(255,255,255,0.1)'
   },
   bannerIcon: {
     fontSize: 32,
@@ -337,12 +337,12 @@ const styles = StyleSheet.create({
   bannerTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text.primary,
+    color: colors.text.white,
     marginBottom: 2
   },
   bannerText: {
     fontSize: 13,
-    color: colors.text.secondary
+    color: 'rgba(255,255,255,0.8)'  
   },
   feed: {
     flex: 1

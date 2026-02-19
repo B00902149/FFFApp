@@ -24,6 +24,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: '👤'
   },
+  profilePicture: {  // ADD THIS
+    type: String,
+    default: null  // Will store base64 or URL
+  },
   bio: {
     type: String,
     maxlength: 500,

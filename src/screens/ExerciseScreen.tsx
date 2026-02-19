@@ -97,7 +97,7 @@ export const ExerciseScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.lightGray
+    backgroundColor: '#001F3F'
   },
   header: {
     flexDirection: 'row',
@@ -106,21 +106,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: 50,
     paddingBottom: spacing.md,
-    backgroundColor: colors.background.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
+    backgroundColor: '#001F3F',
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.accent.blue + '15',
+    backgroundColor: colors.accent.blue,
     alignItems: 'center',
     justifyContent: 'center'
   },
   backIcon: {
     fontSize: 24,
-    color: colors.accent.blue,
+    color: colors.text.white,
     fontWeight: 'bold'
   },
   headerContent: {
@@ -130,7 +128,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.text.primary
+    color: colors.text.white
   },
   subtitle: {
     fontSize: 14,
@@ -157,7 +155,7 @@ const styles = StyleSheet.create({
   motivationText: {
     fontSize: 16,
     fontStyle: 'italic',
-    color: colors.text.primary,
+    color: colors.text.white,
     marginBottom: spacing.xs,
     lineHeight: 24
   },

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
 import { colors, spacing, borderRadius } from '../theme/colors';
-import { profileAPI } from '../services/api';
+import { profileAPI, uploadAPI } from '../services/api';
+import { pickImage, convertImageToBase64 } from '../utils/imagePicker';
 
 const AVATARS = ['👤', '😊', '💪', '🔥', '⚡', '🙏', '✨', '🎯', '🏃', '🏋️', '🤸', '🧘'];
 const FITNESS_GOALS = ['Weight Loss', 'Muscle Gain', 'Maintenance', 'General Fitness', 'Athletic Performance'];
@@ -10,6 +11,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
   const { profile, onUpdate } = route.params || {};
 
   const [avatar, setAvatar] = useState(profile?.avatar || '👤');
+  const [profilePicture, setProfilePicture] = useState(profile?.profilePicture || null);
   const [bio, setBio] = useState(profile?.bio || '');
   const [fitnessGoal, setFitnessGoal] = useState(profile?.fitnessGoal || 'General Fitness');
   const [currentWeight, setCurrentWeight] = useState(profile?.currentWeight?.toString() || '');
@@ -18,6 +20,96 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
   const [weightUnit, setWeightUnit] = useState(profile?.weightUnit || 'kg');
   const [heightUnit, setHeightUnit] = useState(profile?.heightUnit || 'cm');
   const [loading, setLoading] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  const handlePickImage = async (fromCamera: boolean) => {
+    try {
+      const uri = await pickImage(fromCamera);
+      
+      if (uri) {
+        setUploadingPhoto(true);
+        
+        // Convert to base64
+        const base64 = await convertImageToBase64(uri);
+        
+        if (base64) {
+          // Upload to backend
+          const updatedUser = await uploadAPI.uploadProfilePicture(profile._id, base64);
+          
+          setProfilePicture(base64);
+          Alert.alert('Success', 'Profile picture uploaded!');
+          
+          // Update parent
+          if (onUpdate) {
+            onUpdate(updatedUser);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Pick image error:', error);
+      Alert.alert('Error', 'Failed to upload image');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    Alert.alert(
+      'Remove Photo',
+      'Are you sure you want to remove your profile picture?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setUploadingPhoto(true);
+              const updatedUser = await uploadAPI.removeProfilePicture(profile._id);
+              
+              setProfilePicture(null);
+              Alert.alert('Success', 'Profile picture removed');
+              
+              if (onUpdate) {
+                onUpdate(updatedUser);
+              }
+            } catch (error) {
+              console.error('Remove photo error:', error);
+              Alert.alert('Error', 'Failed to remove photo');
+            } finally {
+              setUploadingPhoto(false);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const showImageOptions = () => {
+    Alert.alert(
+      'Profile Picture',
+      'Choose an option',
+      [
+        {
+          text: 'Take Photo',
+          onPress: () => handlePickImage(true)
+        },
+        {
+          text: 'Choose from Gallery',
+          onPress: () => handlePickImage(false)
+        },
+        ...(profilePicture ? [{
+          text: 'Remove Photo',
+          style: 'destructive' as const,
+          onPress: handleRemovePhoto
+        }] : []),
+        {
+          text: 'Cancel',
+          style: 'cancel' as const
+        }
+      ]
+    );
+  };
 
   const handleSave = async () => {
     setLoading(true);
@@ -69,9 +161,65 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
       </View>
 
       <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Avatar Selection */}
+        {/* Profile Picture Section */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Choose Avatar</Text>
+          <Text style={styles.sectionTitle}>Profile Picture</Text>
+          
+          <View style={styles.photoContainer}>
+            <TouchableOpacity 
+              style={styles.photoCircle}
+              onPress={showImageOptions}
+              disabled={uploadingPhoto}
+            >
+              {uploadingPhoto ? (
+                <ActivityIndicator size="large" color={colors.accent.blue} />
+              ) : profilePicture ? (
+                <Image 
+                  source={{ uri: profilePicture }}
+                  style={styles.profileImage}
+                />
+              ) : (
+                <Text style={styles.photoPlaceholder}>📷</Text>
+              )}
+            </TouchableOpacity>
+            
+            <View style={styles.photoButtons}>
+              <TouchableOpacity 
+                style={styles.photoButton}
+                onPress={() => handlePickImage(true)}
+                disabled={uploadingPhoto}
+              >
+                <Text style={styles.photoButtonIcon}>📷</Text>
+                <Text style={styles.photoButtonText}>Camera</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.photoButton}
+                onPress={() => handlePickImage(false)}
+                disabled={uploadingPhoto}
+              >
+                <Text style={styles.photoButtonIcon}>🖼️</Text>
+                <Text style={styles.photoButtonText}>Gallery</Text>
+              </TouchableOpacity>
+              
+              {profilePicture && (
+                <TouchableOpacity 
+                  style={[styles.photoButton, styles.removeButton]}
+                  onPress={handleRemovePhoto}
+                  disabled={uploadingPhoto}
+                >
+                  <Text style={styles.photoButtonIcon}>🗑️</Text>
+                  <Text style={styles.photoButtonText}>Remove</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* Avatar Selection (Emoji fallback) */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Choose Avatar Emoji</Text>
+          <Text style={styles.sectionSubtitle}>Used when no profile picture is set</Text>
           <View style={styles.avatarsGrid}>
             {AVATARS.map((item) => (
               <TouchableOpacity
@@ -265,7 +413,60 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.text.primary,
+    marginBottom: spacing.sm
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    color: colors.text.secondary,
     marginBottom: spacing.md
+  },
+  photoContainer: {
+    alignItems: 'center'
+  },
+  photoCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: colors.background.lightGray,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.lg,
+    borderWidth: 3,
+    borderColor: colors.accent.blue,
+    overflow: 'hidden'
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover'
+  },
+  photoPlaceholder: {
+    fontSize: 48
+  },
+  photoButtons: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    flexWrap: 'wrap',
+    justifyContent: 'center'
+  },
+  photoButton: {
+    alignItems: 'center',
+    padding: spacing.md,
+    backgroundColor: colors.background.lightGray,
+    borderRadius: borderRadius.small,
+    minWidth: 80
+  },
+  removeButton: {
+    backgroundColor: colors.accent.red + '20'
+  },
+  photoButtonIcon: {
+    fontSize: 24,
+    marginBottom: spacing.xs
+  },
+  photoButtonText: {
+    fontSize: 12,
+    color: colors.text.secondary,
+    fontWeight: '600'
   },
   avatarsGrid: {
     flexDirection: 'row',

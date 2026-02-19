@@ -38,20 +38,7 @@ export const DashboardScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.userInfo}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>👤</Text>
-          </View>
-          <Text style={styles.username}>Welcome!</Text>
-        </View>
-        <TouchableOpacity style={styles.notification}>
-          <Text style={styles.notificationIcon}>🔔</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
+    <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
         {/* Daily Verse */}
         <View style={styles.verseCard}>
           <Text style={styles.verseLabel}>Daily Verse</Text>
@@ -92,52 +79,17 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.primary.dark
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.lg,
-    paddingTop: 60
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm
-  },
-  avatarText: {
-    fontSize: 20
-  },
-  username: {
-    color: colors.text.white,
-    fontSize: 16,
-    fontWeight: '600'
-  },
-  notification: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  notificationIcon: {
-    fontSize: 24
-  },
   scrollView: {
-    flex: 1
+    flex: 1,
+    backgroundColor: colors.primary.dark
   },
   content: {
     padding: spacing.lg,
-    paddingBottom: 100
+    paddingTop: spacing.md,
+    paddingBottom: 40
   },
   verseCard: {
-    backgroundColor: 'rgba(255,255,255,0.95)',
+    backgroundColor: '#022b54',
     borderRadius: borderRadius.medium,
     padding: spacing.lg,
     marginBottom: spacing.lg,
@@ -154,14 +106,14 @@ const styles = StyleSheet.create({
   verseText: {
     fontSize: 16,
     fontStyle: 'italic',
-    color: colors.text.primary,
+    color: colors.text.white,
     marginBottom: spacing.sm,
     lineHeight: 24
   },
   verseReference: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text.secondary,
+    color: colors.accent.blue,
     textAlign: 'right'
   },
   grid: {
@@ -199,16 +151,20 @@ const styles = StyleSheet.create({
     textAlign: 'center'
   },
   quoteCard: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: '#022b54',
     borderRadius: borderRadius.medium,
-    padding: spacing.lg,
-    marginBottom: spacing.xl
+    padding: spacing.xl,
+    marginBottom: spacing.xl,
   },
   quote: {
-    fontSize: 16,
+    fontSize: 17,
     fontStyle: 'italic',
     color: colors.text.white,
     textAlign: 'center',
-    lineHeight: 24
+    lineHeight: 26,
+    fontWeight: '600',
+    textShadowColor: 'rgba(0,0,0,0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2
   }
 });

@@ -234,7 +234,7 @@ const styles = StyleSheet.create({
     fontWeight: '600'
   },
   addButtonDisabled: {
-    opacity: 0.3
+    opacity: 1
   },
   searchContainer: {
     padding: spacing.lg,

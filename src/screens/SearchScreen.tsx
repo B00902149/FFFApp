@@ -32,6 +32,22 @@ export const SearchScreen = ({ navigation }: any) => {
     return matchesSearch && matchesFilter;
   });
 
+  const handleExerciseTap = (exercise: any) => {
+    console.log('Exercise tapped:', exercise.name);
+    
+    // Navigate to ExerciseDetail with exercise data
+    navigation.navigate('ExerciseDetail', {
+      exercise: {
+        name: exercise.name,
+        category: exercise.category,
+        rating: exercise.rating,
+        sets: 4,
+        reps: '8-12',
+        weight: '60kg'
+      }
+    });
+  };
+
   const renderStars = (rating: number) => {
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 !== 0;
@@ -49,7 +65,8 @@ export const SearchScreen = ({ navigation }: any) => {
   const renderExercise = ({ item }: { item: any }) => (
     <TouchableOpacity 
       style={styles.exerciseCard}
-      onPress={() => console.log('Exercise tapped:', item.name)}
+      onPress={() => handleExerciseTap(item)}
+      activeOpacity={0.7}
     >
       <View style={styles.exerciseInfo}>
         <Text style={styles.exerciseName}>{item.name}</Text>
@@ -60,7 +77,10 @@ export const SearchScreen = ({ navigation }: any) => {
           <Text style={styles.reviewCount}>({item.reviews})</Text>
         </View>
       </View>
-      <TouchableOpacity style={styles.playButton}>
+      <TouchableOpacity 
+        style={styles.playButton}
+        onPress={() => handleExerciseTap(item)}
+      >
         <Text style={styles.playIcon}>▶️</Text>
       </TouchableOpacity>
     </TouchableOpacity>
@@ -68,16 +88,16 @@ export const SearchScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      {/* Header with Done Button */}
-        <View style={styles.header}>
+      {/* Header with Close Button */}
+      <View style={styles.header}>
         <Text style={styles.title}>Exercise Search</Text>
         <TouchableOpacity 
-            style={styles.closeButton}
-            onPress={() => navigation.navigate('DashboardTab')}
+          style={styles.closeButton}
+          onPress={() => navigation.navigate('DashboardTab')}
         >
-            <Text style={styles.closeIcon}>✕</Text>
+          <Text style={styles.closeIcon}>✕</Text>
         </TouchableOpacity>
-        </View>
+      </View>
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -126,7 +146,11 @@ export const SearchScreen = ({ navigation }: any) => {
         keyExtractor={item => item.id}
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
-          <Text style={styles.emptyText}>No exercises found</Text>
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyIcon}>🔍</Text>
+            <Text style={styles.emptyText}>No exercises found</Text>
+            <Text style={styles.emptySubtext}>Try a different search or filter</Text>
+          </View>
         }
       />
     </View>
@@ -136,7 +160,7 @@ export const SearchScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.lightGray
+    backgroundColor: colors.primary.dark  // Changed from lightGray
   },
   header: {
     flexDirection: 'row',
@@ -145,41 +169,42 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: 50,
     paddingBottom: spacing.md,
-    backgroundColor: colors.background.white,
+    backgroundColor: colors.primary.dark,  // Changed from white
     borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
+    borderBottomColor: 'rgba(255,255,255,0.1)'  // Changed border color
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: colors.text.primary,
+    color: colors.text.white,  // Changed from primary
     flex: 1
   },
   closeButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.background.lightGray,
+    backgroundColor: colors.accent.blue + '90',  // Changed
     alignItems: 'center',
     justifyContent: 'center'
-    },
+  },
   closeIcon: {
-  fontSize: 20,
-  color: colors.text.secondary,
-  fontWeight: 'bold'
-},
+    fontSize: 20,
+    color: colors.text.white,  // Changed
+    fontWeight: 'bold'
+  },
   searchContainer: {
     flexDirection: 'row',
     padding: spacing.lg,
-    backgroundColor: colors.background.white,
+    backgroundColor: colors.primary.dark,  // Changed from white
     gap: spacing.sm
   },
   searchInput: {
     flex: 1,
-    backgroundColor: colors.background.lightGray,
+    backgroundColor: 'rgba(255,255,255,0.1)',  // Changed
     borderRadius: borderRadius.small,
     padding: spacing.md,
-    fontSize: 16
+    fontSize: 16,
+    color: colors.text.white  // Changed
   },
   searchButton: {
     width: 50,
@@ -193,7 +218,7 @@ const styles = StyleSheet.create({
     fontSize: 20
   },
   filtersContainer: {
-    backgroundColor: colors.background.white,
+    backgroundColor: colors.primary.dark,  // Changed from white
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.md
   },
@@ -201,7 +226,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.large,
-    backgroundColor: colors.background.lightGray,
+    backgroundColor: 'rgba(255,255,255,0.1)',  // Changed
     marginRight: spacing.sm
   },
   filterChipActive: {
@@ -210,7 +235,7 @@ const styles = StyleSheet.create({
   filterText: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text.secondary
+    color: colors.text.white  // Changed
   },
   filterTextActive: {
     color: colors.text.white
@@ -219,6 +244,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     paddingBottom: 100
   },
+  // Exercise cards stay white for contrast
   exerciseCard: {
     flexDirection: 'row',
     backgroundColor: colors.background.white,
@@ -227,9 +253,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2
+    elevation: 3
   },
   exerciseInfo: {
     flex: 1
@@ -278,10 +304,24 @@ const styles = StyleSheet.create({
   playIcon: {
     fontSize: 20
   },
+  emptyState: {
+    alignItems: 'center',
+    paddingTop: spacing.xl * 3
+  },
+  emptyIcon: {
+    fontSize: 64,
+    marginBottom: spacing.md
+  },
   emptyText: {
     textAlign: 'center',
-    fontSize: 16,
-    color: colors.text.secondary,
-    marginTop: spacing.xl
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: spacing.xs
+  },
+  emptySubtext: {
+    textAlign: 'center',
+    fontSize: 14,
+    color: colors.text.secondary
   }
 });

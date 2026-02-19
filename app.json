@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "FFFApp",
+    "name": "Faith.Fitness.Fuel.",
     "slug": "FFFApp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,13 +13,23 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.fff",
+      "infoPlist": {
+        "NSHealthShareUsageDescription": "This app needs access to your health data to track your fitness progress.",
+        "NSHealthUpdateUsageDescription": "This app needs permission to update your health data."
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
+        "backgroundColor": "#ffffff",
+        "package": "com.yourcompany.fff",
+      "permissions": [
+        "android.permission.ACTIVITY_RECOGNITION"
+          ]
+        }
+      }
+     },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
@@ -27,4 +37,3 @@
       "favicon": "./assets/favicon.png"
     }
   }
-}

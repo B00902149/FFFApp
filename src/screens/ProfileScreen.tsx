@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, RefreshControl, Image} from 'react-native';
 import { colors, spacing, borderRadius } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { profileAPI } from '../services/api';
@@ -133,7 +133,14 @@ export const ProfileScreen = ({ navigation }: any) => {
         {/* Profile Header */}
         <View style={styles.profileHeader}>
           <View style={styles.avatarLarge}>
-            <Text style={styles.avatarLargeText}>{profile?.avatar || '👤'}</Text>
+            {profile?.profilePicture ? (
+              <Image 
+                source={{ uri: profile.profilePicture }}
+                style={{ width: '100%', height: '100%', borderRadius: 50 }}
+              />
+            ) : (
+              <Text style={styles.avatarLargeText}>{profile?.avatar || '👤'}</Text>
+            )}
           </View>
           <Text style={styles.profileName}>{profile?.username}</Text>
           <Text style={styles.profileEmail}>{profile?.email}</Text>
@@ -289,7 +296,7 @@ export const ProfileScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.lightGray
+    backgroundColor: colors.primary.dark  // Changed from lightGray
   },
   header: {
     flexDirection: 'row',
@@ -298,38 +305,32 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: 50,
     paddingBottom: spacing.md,
-    backgroundColor: colors.background.white,
+    backgroundColor: colors.primary.dark,  // Changed from white
     borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
+    borderBottomColor: 'rgba(255,255,255,0.1)'  // Changed
   },
   headerTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: colors.text.primary
+    color: colors.text.white  // Changed from primary
   },
   logoutButton: {
     fontSize: 16,
     color: colors.accent.red,
     fontWeight: '600'
   },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  loadingText: {
-    marginTop: spacing.md,
-    fontSize: 16,
-    color: colors.text.secondary
-  },
   content: {
     flex: 1
   },
+  // Profile header stays white for contrast
   profileHeader: {
-    backgroundColor: colors.background.white,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     alignItems: 'center',
     paddingVertical: spacing.xl,
-    marginBottom: spacing.sm
+    marginBottom: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    borderRadius: borderRadius.medium
   },
   avatarLarge: {
     width: 100,
@@ -487,12 +488,12 @@ const styles = StyleSheet.create({
   faithTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text.secondary,
+    color: colors.text.white,
     marginBottom: 4
   },
   faithText: {
     fontSize: 16,
-    color: colors.text.primary,
+    color: colors.text.secondary,
     fontWeight: '600'
   },
   actionButton: {
@@ -518,5 +519,15 @@ const styles = StyleSheet.create({
   },
   bottomSpacer: {
     height: 100
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  loadingText: {
+    marginTop: spacing.md,
+    fontSize: 16,
+    color: colors.text.secondary
   }
 });

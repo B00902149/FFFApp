@@ -1,55 +1,86 @@
 import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  StyleSheet, 
-  TouchableOpacity, 
-  Alert, 
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Keyboard,
-  TouchableWithoutFeedback
-} from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ScrollView, Modal } from 'react-native';
 import { colors, spacing, borderRadius } from '../theme/colors';
 import { workoutAPI } from '../services/api';
 
 export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
-  const { workoutId } = route.params || {};
+  const { workout, onComplete } = route.params || {};
+  
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [templateName, setTemplateName] = useState('');
 
   const handleSubmit = async () => {
-  Keyboard.dismiss();
-  
-  if (rating === 0) {
-    Alert.alert('Please rate your workout', 'Tap the stars to rate your workout');
+    if (rating === 0) {
+      Alert.alert('Rating Required', 'Please rate your workout before completing');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      await workoutAPI.completeWorkout(workout._id, rating, comment);
+      setLoading(false);
+      
+      Alert.alert(
+        'Workout Complete! 🎉',
+        'Great job! Would you like to save this as a template?',
+        [
+          {
+            text: 'No Thanks',
+            style: 'cancel',
+            onPress: () => {
+              if (onComplete) onComplete();
+              navigation.goBack();
+            }
+          },
+          {
+            text: 'Save Template',
+            onPress: () => {
+              setTemplateName(workout.title);
+              setShowTemplateModal(true);
+            }
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Complete workout error:', error);
+      Alert.alert('Error', 'Failed to complete workout');
+      setLoading(false);
+    }
+  };
+
+  const handleSaveTemplate = async () => {
+  if (!templateName || templateName.trim() === '') {
+    Alert.alert('Error', 'Please enter a template name');
     return;
   }
 
-  setLoading(true);
   try {
-    console.log('Completing workout:', workoutId, 'Rating:', rating);
-    await workoutAPI.completeWorkout(workoutId, rating, comment);
+    await workoutAPI.saveAsTemplate(workout._id, templateName.trim());
+    setShowTemplateModal(false);
     
     Alert.alert(
-      'Workout Complete! 🎉',
-      'Great job! Your progress has been saved.',
+      'Success! 💪',
+      'Template saved! You can use it anytime from the Templates screen.',
       [
         {
           text: 'OK',
-          onPress: () => navigation.navigate('Main')  // ✅ FIXED
+          onPress: () => {
+            if (onComplete) onComplete();
+            // CHANGE THIS:
+            navigation.navigate('Main', { screen: 'DashboardTab' });
+            // OR JUST USE:
+            // navigation.popToTop();
+          }
         }
       ]
     );
-  } catch (error: any) {
-    console.error('Failed to complete workout:', error);
-    Alert.alert('Error', error.error || 'Failed to save workout');
-  } finally {
-    setLoading(false);
+  } catch (error) {
+    console.error('Save template error:', error);
+    Alert.alert('Error', 'Failed to save template');
+    setShowTemplateModal(false);
   }
 };
 
@@ -60,11 +91,13 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
           <TouchableOpacity
             key={star}
             onPress={() => setRating(star)}
-            disabled={loading}
             style={styles.starButton}
           >
-            <Text style={styles.star}>
-              {star <= rating ? '⭐' : '☆'}
+            <Text style={[
+              styles.star,
+              star <= rating && styles.starFilled
+            ]}>
+              ★
             </Text>
           </TouchableOpacity>
         ))}
@@ -75,106 +108,106 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
   return (
     <KeyboardAvoidingView 
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Workout Complete!</Text>
+          <Text style={styles.subtitle}>How did you do?</Text>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Rate Your Workout</Text>
+          {renderStars()}
+          {rating > 0 && (
+            <Text style={styles.ratingText}>
+              {rating === 1 && "Better luck next time"}
+              {rating === 2 && "Keep pushing!"}
+              {rating === 3 && "Good effort"}
+              {rating === 4 && "Great workout!"}
+              {rating === 5 && "Crushing it! 🔥"}
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Notes (Optional)</Text>
+          <TextInput
+            style={styles.textInput}
+            placeholder="How did you feel? Any personal records?"
+            placeholderTextColor={colors.text.secondary}
+            value={comment}
+            onChangeText={setComment}
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+        </View>
+
+        <View style={styles.prayerCard}>
+          <Text style={styles.prayerIcon}>🙏</Text>
+          <View style={styles.prayerContent}>
+            <Text style={styles.prayerTitle}>Take a moment to pray</Text>
+            <Text style={styles.prayerText}>
+              Thank God for the strength to complete this workout and ask for continued discipline in your fitness journey.
+            </Text>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.completeButton, loading && styles.buttonDisabled]}
+          onPress={handleSubmit}
           disabled={loading}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <Text style={styles.completeButtonText}>
+            {loading ? 'Saving...' : 'Complete Workout'}
+          </Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Complete Workout</Text>
-        <View style={styles.placeholder} />
-      </View>
-
-      <ScrollView 
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View>
-            {/* Success Icon */}
-            <View style={styles.iconContainer}>
-              <Text style={styles.successIcon}>✓</Text>
-            </View>
-
-            {/* Title */}
-            <Text style={styles.title}>Workout Complete!</Text>
-            <Text style={styles.subtitle}>
-              Great job! Share your experience with the community
-            </Text>
-
-            {/* Rating */}
-            <View style={styles.section}>
-              <Text style={styles.label}>Rate your workout</Text>
-              {renderStars()}
-              {rating > 0 && (
-                <Text style={styles.ratingText}>
-                  {rating === 5 ? 'Amazing! 🔥' : rating === 4 ? 'Great work! 💪' : rating === 3 ? 'Good effort! 👍' : rating === 2 ? 'Keep going! 💪' : 'Every step counts! 🙏'}
-                </Text>
-              )}
-            </View>
-
-            {/* Comment */}
-            <View style={styles.section}>
-              <Text style={styles.label}>How do you feel? (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Share your thoughts, testimony, or what God revealed to you today..."
-                placeholderTextColor={colors.text.secondary}
-                value={comment}
-                onChangeText={setComment}
-                multiline
-                numberOfLines={6}
-                editable={!loading}
-                textAlignVertical="top"
-                maxLength={500}
-              />
-              <Text style={styles.characterCount}>{comment.length}/500</Text>
-            </View>
-
-            {/* Prayer Prompt */}
-            <View style={styles.prayerPrompt}>
-              <Text style={styles.prayerIcon}>🙏</Text>
-              <Text style={styles.prayerText}>
-                Take a moment to thank God for the strength He gave you today
-              </Text>
-            </View>
-
-            {/* Buttons */}
-            <View style={styles.buttons}>
-              <TouchableOpacity
-                style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-                onPress={handleSubmit}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color={colors.text.white} />
-                ) : (
-                  <Text style={styles.submitButtonText}>Complete & Save</Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity 
-                style={styles.skipButton}
-                onPress={() => navigation.navigate('Main')}  // ✅ FIXED
-                disabled={loading}
-              >
-                <Text style={styles.skipText}>Skip for now</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Extra space at bottom for keyboard */}
-            <View style={styles.bottomSpacer} />
-          </View>
-        </TouchableWithoutFeedback>
       </ScrollView>
+
+      {/* Template Name Modal */}
+      <Modal
+        visible={showTemplateModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTemplateModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Save as Template</Text>
+            <Text style={styles.modalSubtitle}>Enter a name for this workout template:</Text>
+            
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Template name"
+              placeholderTextColor={colors.text.secondary}
+              value={templateName}
+              onChangeText={setTemplateName}
+              autoFocus
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel]}
+                onPress={() => {
+                  setShowTemplateModal(false);
+                  if (onComplete) onComplete();
+                  navigation.goBack();
+                }}
+              >
+                <Text style={styles.modalButtonTextCancel}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonSave]}
+                onPress={handleSaveTemplate}
+              >
+                <Text style={styles.modalButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -182,83 +215,33 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.white
+    backgroundColor: colors.primary.dark
+  },
+  content: {
+    padding: spacing.lg,
+    paddingTop: 60
   },
   header: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingTop: 50,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.background.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.accent.blue + '15',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  backIcon: {
-    fontSize: 24,
-    color: colors.accent.blue,
-    fontWeight: 'bold'
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    flex: 1,
-    textAlign: 'center'
-  },
-  placeholder: {
-    width: 40
-  },
-  scrollView: {
-    flex: 1
-  },
-  scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: spacing.xl * 3
-  },
-  iconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.accent.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: spacing.lg,
-    marginTop: spacing.lg
-  },
-  successIcon: {
-    fontSize: 60,
-    color: colors.text.white,
-    fontWeight: 'bold'
+    marginBottom: spacing.xl
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: colors.text.primary,
-    textAlign: 'center',
-    marginBottom: spacing.sm
+    color: colors.text.white,
+    marginBottom: spacing.xs
   },
   subtitle: {
     fontSize: 16,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginBottom: spacing.xl,
-    paddingHorizontal: spacing.lg
+    color: 'rgba(255,255,255,0.8)'
   },
   section: {
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderRadius: borderRadius.medium,
+    padding: spacing.lg,
     marginBottom: spacing.lg
   },
-  label: {
+  sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.text.primary,
@@ -267,84 +250,137 @@ const styles = StyleSheet.create({
   starsContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.sm
+    marginBottom: spacing.sm,
+    color: "rgba(128, 128, 128, 0.8)"
   },
   starButton: {
+    backgroundColor: "rgba(255,255,255,0.2)",
     padding: spacing.xs
   },
   star: {
-    fontSize: 40
+    fontSize: 40,
+    color: colors.background.lightGray
+  },
+  starFilled: {
+    color: colors.accent.blue
   },
   ratingText: {
     fontSize: 14,
     color: colors.accent.blue,
     textAlign: 'center',
-    fontWeight: '600',
-    marginTop: spacing.sm
+    fontWeight: '600'
   },
-  input: {
+  textInput: {
     backgroundColor: colors.background.lightGray,
     borderRadius: borderRadius.small,
     padding: spacing.md,
     fontSize: 16,
-    minHeight: 120,
-    textAlignVertical: 'top'
+    minHeight: 100,
+    color: colors.text.primary
   },
-  characterCount: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    textAlign: 'right',
-    marginTop: spacing.xs
-  },
-  prayerPrompt: {
+  prayerCard: {
     flexDirection: 'row',
-    backgroundColor: colors.accent.blue + '15',
-    borderRadius: borderRadius.medium,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     padding: spacing.lg,
-    marginBottom: spacing.xl,
+    borderRadius: borderRadius.medium,
+    marginBottom: spacing.lg,
     borderLeftWidth: 4,
     borderLeftColor: colors.accent.blue
   },
   prayerIcon: {
-    fontSize: 24,
+    fontSize: 28,
     marginRight: spacing.md
   },
+  prayerContent: {
+    flex: 1
+  },
+  prayerTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.white,
+    marginBottom: spacing.xs
+  },
   prayerText: {
-    flex: 1,
     fontSize: 14,
-    color: colors.text.primary,
+    color: 'rgba(255,255,255,0.8)',
     lineHeight: 20
   },
-  buttons: {
-    gap: spacing.md,
-    marginBottom: spacing.lg
-  },
-  submitButton: {
-    backgroundColor: colors.accent.blue,
+  completeButton: {
+    backgroundColor: colors.accent.green,
     borderRadius: borderRadius.medium,
     padding: spacing.lg,
     alignItems: 'center',
-    minHeight: 56,
-    justifyContent: 'center'
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3
   },
-  submitButtonDisabled: {
+  buttonDisabled: {
     opacity: 0.6
   },
-  submitButtonText: {
+  completeButtonText: {
     color: colors.text.white,
     fontSize: 18,
     fontWeight: 'bold'
   },
-  skipButton: {
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg
+  },
+  modalContent: {
+    backgroundColor: colors.background.white,
+    borderRadius: borderRadius.medium,
+    padding: spacing.xl,
+    width: '100%',
+    maxWidth: 400
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+    marginBottom: spacing.sm
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    marginBottom: spacing.lg
+  },
+  modalInput: {
+    backgroundColor: colors.background.lightGray,
+    borderRadius: borderRadius.small,
     padding: spacing.md,
+    fontSize: 16,
+    color: colors.text.primary,
+    marginBottom: spacing.lg
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: spacing.md
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.small,
     alignItems: 'center'
   },
-  skipText: {
-    fontSize: 16,
-    color: colors.text.secondary
+  modalButtonCancel: {
+    backgroundColor: colors.background.lightGray
   },
-  bottomSpacer: {
-    height: 100
+  modalButtonSave: {
+    backgroundColor: colors.accent.blue
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.white
+  },
+  modalButtonTextCancel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary
   }
 });

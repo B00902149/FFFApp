@@ -378,6 +378,15 @@ export const ProfileScreen = ({ navigation }: any) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           
+            <TouchableOpacity 
+              style={styles.actionButton}
+              onPress={() => navigation.navigate('WorkoutTemplates')}
+            >
+              <Text style={styles.actionIcon}>📋</Text>
+              <Text style={styles.actionText}>Workout Templates</Text>
+              <Text style={styles.actionArrow}>›</Text>
+            </TouchableOpacity>
+
           <TouchableOpacity 
             style={styles.actionButton}
             onPress={() => navigation.navigate('Exercise')}

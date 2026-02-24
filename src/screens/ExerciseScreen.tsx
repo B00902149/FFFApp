@@ -1,48 +1,210 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { colors, spacing, borderRadius } from '../theme/colors';
-
-interface Exercise {
-  id: string;
-  name: string;
-  sets: number;
-  reps: string;
-  weight?: string;
-}
+import { useAuth } from '../context/AuthContext';
+import { workoutAPI } from '../services/api';
 
 export const ExerciseScreen = ({ navigation }: any) => {
-  const [workoutData, setWorkoutData] = useState({
-    warmup: [
-      { id: '1', name: 'Arm Circles', sets: 2, reps: '10' },
-      { id: '2', name: 'Light Cardio', sets: 1, reps: '5 min' }
-    ],
-    exercises: [
-      { id: '3', name: 'Bench Press', sets: 4, reps: '8-10', weight: '60kg' },
-      { id: '4', name: 'Incline DB Press', sets: 3, reps: '10-12', weight: '20kg' },
-      { id: '5', name: 'Cable Flyes', sets: 3, reps: '12-15', weight: '15kg' }
-    ]
-  });
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(false);
 
-  const handleExerciseDetail = (exercise: Exercise) => {
-    navigation.navigate('ExerciseDetail', { exercise });
+  const predefinedWorkouts = [
+    {
+      id: 1,
+      title: 'Upper Body Strength',
+      description: 'Chest, shoulders, and triceps',
+      emoji: '💪',
+      exercises: [
+        {
+          name: 'Bench Press',
+          sets: [
+            { reps: 10, weight: 60, completed: false },
+            { reps: 10, weight: 60, completed: false },
+            { reps: 8, weight: 65, completed: false },
+            { reps: 8, weight: 65, completed: false }
+          ]
+        },
+        {
+          name: 'Overhead Press',
+          sets: [
+            { reps: 10, weight: 40, completed: false },
+            { reps: 10, weight: 40, completed: false },
+            { reps: 10, weight: 40, completed: false }
+          ]
+        },
+        {
+          name: 'Incline Dumbbell Press',
+          sets: [
+            { reps: 12, weight: 20, completed: false },
+            { reps: 12, weight: 20, completed: false },
+            { reps: 12, weight: 20, completed: false }
+          ]
+        },
+        {
+          name: 'Tricep Dips',
+          sets: [
+            { reps: 12, weight: 0, completed: false },
+            { reps: 12, weight: 0, completed: false },
+            { reps: 10, weight: 0, completed: false }
+          ]
+        }
+      ]
+    },
+    {
+      id: 2,
+      title: 'Lower Body Power',
+      description: 'Squats, deadlifts, and leg work',
+      emoji: '🦵',
+      exercises: [
+        {
+          name: 'Barbell Squats',
+          sets: [
+            { reps: 8, weight: 80, completed: false },
+            { reps: 8, weight: 80, completed: false },
+            { reps: 8, weight: 80, completed: false },
+            { reps: 6, weight: 85, completed: false }
+          ]
+        },
+        {
+          name: 'Romanian Deadlifts',
+          sets: [
+            { reps: 10, weight: 60, completed: false },
+            { reps: 10, weight: 60, completed: false },
+            { reps: 10, weight: 60, completed: false }
+          ]
+        },
+        {
+          name: 'Leg Press',
+          sets: [
+            { reps: 12, weight: 100, completed: false },
+            { reps: 12, weight: 100, completed: false },
+            { reps: 12, weight: 100, completed: false }
+          ]
+        },
+        {
+          name: 'Leg Curls',
+          sets: [
+            { reps: 12, weight: 30, completed: false },
+            { reps: 12, weight: 30, completed: false },
+            { reps: 12, weight: 30, completed: false }
+          ]
+        }
+      ]
+    },
+    {
+      id: 3,
+      title: 'Back & Biceps',
+      description: 'Pull exercises and arms',
+      emoji: '🏋️',
+      exercises: [
+        {
+          name: 'Pull-ups',
+          sets: [
+            { reps: 8, weight: 0, completed: false },
+            { reps: 8, weight: 0, completed: false },
+            { reps: 6, weight: 0, completed: false }
+          ]
+        },
+        {
+          name: 'Barbell Rows',
+          sets: [
+            { reps: 10, weight: 50, completed: false },
+            { reps: 10, weight: 50, completed: false },
+            { reps: 10, weight: 50, completed: false }
+          ]
+        },
+        {
+          name: 'Lat Pulldown',
+          sets: [
+            { reps: 12, weight: 45, completed: false },
+            { reps: 12, weight: 45, completed: false },
+            { reps: 12, weight: 45, completed: false }
+          ]
+        },
+        {
+          name: 'Bicep Curls',
+          sets: [
+            { reps: 12, weight: 15, completed: false },
+            { reps: 12, weight: 15, completed: false },
+            { reps: 10, weight: 17.5, completed: false }
+          ]
+        }
+      ]
+    },
+    {
+      id: 4,
+      title: 'Full Body HIIT',
+      description: 'High intensity conditioning',
+      emoji: '🔥',
+      exercises: [
+        {
+          name: 'Burpees',
+          sets: [
+            { reps: 15, weight: 0, completed: false },
+            { reps: 15, weight: 0, completed: false },
+            { reps: 15, weight: 0, completed: false }
+          ]
+        },
+        {
+          name: 'Push-ups',
+          sets: [
+            { reps: 20, weight: 0, completed: false },
+            { reps: 20, weight: 0, completed: false },
+            { reps: 15, weight: 0, completed: false }
+          ]
+        },
+        {
+          name: 'Mountain Climbers',
+          sets: [
+            { reps: 30, weight: 0, completed: false },
+            { reps: 30, weight: 0, completed: false },
+            { reps: 30, weight: 0, completed: false }
+          ]
+        },
+        {
+          name: 'Jump Squats',
+          sets: [
+            { reps: 15, weight: 0, completed: false },
+            { reps: 15, weight: 0, completed: false },
+            { reps: 15, weight: 0, completed: false }
+          ]
+        }
+      ]
+    }
+  ];
+
+  const handleStartWorkout = async (workout: any) => {
+    try {
+      if (!user?.id) {
+        Alert.alert('Error', 'Please login to start a workout');
+        return;
+      }
+
+      setLoading(true);
+
+      // Create workout in database
+      const newWorkout = {
+        userId: user.id,
+        title: workout.title,
+        exercises: workout.exercises
+      };
+
+      console.log('Creating workout:', newWorkout);
+
+      const createdWorkout = await workoutAPI.createWorkout(newWorkout);
+      
+      setLoading(false);
+
+      // Navigate to progress screen
+      navigation.navigate('ExerciseProgress', { 
+        workout: createdWorkout
+      });
+    } catch (error) {
+      console.error('Failed to start workout:', error);
+      setLoading(false);
+      Alert.alert('Error', 'Failed to start workout. Please try again.');
+    }
   };
-
-  const renderExerciseRow = (exercise: Exercise) => (
-    <View key={exercise.id} style={styles.exerciseRow}>
-      <View style={styles.exerciseInfo}>
-        <Text style={styles.exerciseName}>{exercise.name}</Text>
-        <Text style={styles.exerciseDetails}>
-          {exercise.sets} sets × {exercise.reps} {exercise.weight ? `@ ${exercise.weight}` : ''}
-        </Text>
-      </View>
-      <TouchableOpacity 
-        style={styles.playButton}
-        onPress={() => handleExerciseDetail(exercise)}
-      >
-        <Text style={styles.playIcon}>▶️</Text>
-      </TouchableOpacity>
-    </View>
-  );
 
   return (
     <View style={styles.container}>
@@ -54,14 +216,18 @@ export const ExerciseScreen = ({ navigation }: any) => {
         >
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.title}>Training Day 2</Text>
-          <Text style={styles.subtitle}>Upper Body Push</Text>
-        </View>
-        <View style={styles.placeholder} />
+        
+        <Text style={styles.headerTitle}>Workouts</Text>
+        
+        <TouchableOpacity 
+          style={styles.templatesButton}
+          onPress={() => navigation.navigate('WorkoutTemplates')}
+        >
+          <Text style={styles.templatesButtonText}>📋</Text>
+        </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
+      <ScrollView style={styles.content}>
         {/* Faith Motivation */}
         <View style={styles.motivationCard}>
           <Text style={styles.motivationText}>
@@ -70,25 +236,70 @@ export const ExerciseScreen = ({ navigation }: any) => {
           <Text style={styles.motivationRef}>Philippians 4:13</Text>
         </View>
 
-        {/* Warm Up Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Warm Up</Text>
-          {workoutData.warmup.map(renderExerciseRow)}
+        {/* Workout Cards */}
+        <View style={styles.workoutsContainer}>
+          {predefinedWorkouts.map((workout) => (
+            <TouchableOpacity
+              key={workout.id}
+              style={styles.workoutCard}
+              onPress={() => handleStartWorkout(workout)}
+              disabled={loading}
+            >
+              <View style={styles.workoutHeader}>
+                <Text style={styles.workoutEmoji}>{workout.emoji}</Text>
+                <View style={styles.workoutInfo}>
+                  <Text style={styles.workoutTitle}>{workout.title}</Text>
+                  <Text style={styles.workoutDescription}>{workout.description}</Text>
+                </View>
+              </View>
+
+              <View style={styles.workoutStats}>
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>{workout.exercises.length}</Text>
+                  <Text style={styles.statLabel}>exercises</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>
+                    {workout.exercises.reduce((total, ex) => total + ex.sets.length, 0)}
+                  </Text>
+                  <Text style={styles.statLabel}>sets</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <Text style={styles.statValue}>~45</Text>
+                  <Text style={styles.statLabel}>mins</Text>
+                </View>
+              </View>
+
+              <View style={styles.startButtonContainer}>
+                {loading ? (
+                  <ActivityIndicator size="small" color={colors.accent.blue} />
+                ) : (
+                  <>
+                    <Text style={styles.startButtonText}>Start Workout</Text>
+                    <Text style={styles.startButtonIcon}>▶️</Text>
+                  </>
+                )}
+              </View>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        {/* Exercises Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Exercises</Text>
-          {workoutData.exercises.map(renderExerciseRow)}
-        </View>
-
-        {/* Start Workout Button */}
-        <TouchableOpacity 
-          style={styles.startButton}
-          onPress={() => navigation.navigate('ExerciseProgress')}
+        {/* Templates Link */}
+        <TouchableOpacity
+          style={styles.templatesCard}
+          onPress={() => navigation.navigate('WorkoutTemplates')}
         >
-          <Text style={styles.startButtonText}>Start Workout</Text>
+          <Text style={styles.templatesIcon}>📋</Text>
+          <View style={styles.templatesContent}>
+            <Text style={styles.templatesTitle}>My Templates</Text>
+            <Text style={styles.templatesSubtitle}>View saved workout routines</Text>
+          </View>
+          <Text style={styles.templatesArrow}>›</Text>
         </TouchableOpacity>
+
+        <View style={styles.bottomSpacer} />
       </ScrollView>
     </View>
   );
@@ -97,16 +308,18 @@ export const ExerciseScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#001F3F'
+    backgroundColor: colors.primary.dark
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingTop: 50,
     paddingBottom: spacing.md,
-    backgroundColor: '#001F3F',
+    backgroundColor: colors.primary.dark,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)'
   },
   backButton: {
     width: 40,
@@ -121,31 +334,29 @@ const styles = StyleSheet.create({
     color: colors.text.white,
     fontWeight: 'bold'
   },
-  headerContent: {
-    flex: 1,
-    alignItems: 'center'
-  },
-  title: {
-    fontSize: 20,
+  headerTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: colors.text.white
+    color: colors.text.white,
+    flex: 1,
+    textAlign: 'center'
   },
-  subtitle: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginTop: 2
+  templatesButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
-  placeholder: {
-    width: 40
+  templatesButtonText: {
+    fontSize: 20
   },
   content: {
     flex: 1
   },
-  scrollContent: {
-    paddingBottom: 100
-  },
   motivationCard: {
-    backgroundColor: colors.accent.blue + '15',
+    backgroundColor: 'rgba(255,255,255,0.1)',
     padding: spacing.lg,
     margin: spacing.lg,
     borderRadius: borderRadius.medium,
@@ -165,64 +376,122 @@ const styles = StyleSheet.create({
     color: colors.accent.blue,
     textAlign: 'right'
   },
-  section: {
+  workoutsContainer: {
+    padding: spacing.lg,
+    gap: spacing.md
+  },
+  workoutCard: {
     backgroundColor: colors.background.white,
-    padding: spacing.lg,
-    marginBottom: spacing.sm
-  },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.md
-  },
-  exerciseRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
-  },
-  exerciseInfo: {
-    flex: 1
-  },
-  exerciseName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 4
-  },
-  exerciseDetails: {
-    fontSize: 14,
-    color: colors.text.secondary
-  },
-  playButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.accent.blue + '20',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  playIcon: {
-    fontSize: 16
-  },
-  startButton: {
-    backgroundColor: colors.accent.green,
-    margin: spacing.lg,
-    padding: spacing.lg,
     borderRadius: borderRadius.medium,
-    alignItems: 'center',
+    padding: spacing.lg,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3
   },
+  workoutHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md
+  },
+  workoutEmoji: {
+    fontSize: 40,
+    marginRight: spacing.md
+  },
+  workoutInfo: {
+    flex: 1
+  },
+  workoutTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: colors.text.primary,
+    marginBottom: 4
+  },
+  workoutDescription: {
+    fontSize: 14,
+    color: colors.text.secondary
+  },
+  workoutStats: {
+    flexDirection: 'row',
+    backgroundColor: colors.background.lightGray,
+    borderRadius: borderRadius.small,
+    padding: spacing.md,
+    marginBottom: spacing.md
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center'
+  },
+  statValue: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.accent.blue,
+    marginBottom: 2
+  },
+  statLabel: {
+    fontSize: 12,
+    color: colors.text.secondary
+  },
+  statDivider: {
+    width: 1,
+    height: '100%',
+    backgroundColor: colors.background.lightGray,
+    marginHorizontal: spacing.sm
+  },
+  startButtonContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.accent.blue,
+    padding: spacing.md,
+    borderRadius: borderRadius.small
+  },
   startButtonText: {
     color: colors.text.white,
-    fontSize: 18,
-    fontWeight: 'bold'
+    fontSize: 16,
+    fontWeight: '600',
+    marginRight: spacing.sm
+  },
+  startButtonIcon: {
+    fontSize: 16
+  },
+  templatesCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+    padding: spacing.lg,
+    borderRadius: borderRadius.medium,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3
+  },
+  templatesIcon: {
+    fontSize: 32,
+    marginRight: spacing.md
+  },
+  templatesContent: {
+    flex: 1
+  },
+  templatesTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
+    marginBottom: 2
+  },
+  templatesSubtitle: {
+    fontSize: 13,
+    color: colors.text.secondary
+  },
+  templatesArrow: {
+    fontSize: 28,
+    color: colors.text.secondary
+  },
+  bottomSpacer: {
+    height: 40
   }
 });

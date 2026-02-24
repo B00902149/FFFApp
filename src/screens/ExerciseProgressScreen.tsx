@@ -1,200 +1,134 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { colors, spacing, borderRadius } from '../theme/colors';
-import { useAuth } from '../context/AuthContext';
 import { workoutAPI } from '../services/api';
 
-interface Exercise {
-  name: string;
-  sets: number;
-  reps: string;
-  weight?: string;
-  completed: boolean;
-}
-
-interface SetLog {
-  setNumber: number;
-  reps: string;
-  weight: string;
-  completed: boolean;
-}
-
 export const ExerciseProgressScreen = ({ route, navigation }: any) => {
-  const { user } = useAuth();
-  const { workoutId } = route.params || {};
+  const { workout } = route.params || {};
   
-  const [workout, setWorkout] = useState<any>(null);
-  const [currentExerciseIndex, setCurrentExerciseIndex] = useState(0);
-  const [setLogs, setSetLogs] = useState<SetLog[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [currentWorkout, setCurrentWorkout] = useState(workout);
 
   useEffect(() => {
-    if (workoutId) {
-      loadWorkout();
-    } else {
-      createNewWorkout();
+    if (!workout) {
+      Alert.alert('Error', 'No workout data found');
+      navigation.goBack();
     }
   }, []);
 
-  const loadWorkout = async () => {
+  const handleSetComplete = async (exerciseIndex: number, setIndex: number) => {
     try {
-      const data = await workoutAPI.getWorkout(workoutId);
-      setWorkout(data);
-      initializeSetLogs(data.exercises[0]);
+      const newCompleted = !currentWorkout.exercises[exerciseIndex].sets[setIndex].completed;
+      
+      await workoutAPI.updateSet(
+        currentWorkout._id,
+        exerciseIndex,
+        setIndex,
+        newCompleted
+      );
+
+      // Update local state
+      const updated = { ...currentWorkout };
+      updated.exercises[exerciseIndex].sets[setIndex].completed = newCompleted;
+      setCurrentWorkout(updated);
+
     } catch (error) {
-      console.error('Failed to load workout:', error);
-      Alert.alert('Error', 'Failed to load workout');
+      console.error('Update set error:', error);
+      Alert.alert('Error', 'Failed to update set');
     }
   };
 
-  const createNewWorkout = async () => {
-    try {
-      const newWorkout = {
-        userId: user?.id,
-        title: 'Training Day 2',
-        description: 'Upper Body Push',
-        category: 'Push',
-        exercises: [
-          { name: 'Bench Press', sets: 4, reps: '8-10', weight: '60kg', completed: false },
-          { name: 'Incline DB Press', sets: 3, reps: '10-12', weight: '20kg', completed: false },
-          { name: 'Cable Flyes', sets: 3, reps: '12-15', weight: '15kg', completed: false }
-        ]
-      };
-
-      const created = await workoutAPI.createWorkout(newWorkout);
-      setWorkout(created);
-      initializeSetLogs(created.exercises[0]);
-    } catch (error) {
-      console.error('Failed to create workout:', error);
-      Alert.alert('Error', 'Failed to create workout');
-    }
-  };
-
-  const initializeSetLogs = (exercise: Exercise) => {
-    const logs: SetLog[] = [];
-    for (let i = 0; i < exercise.sets; i++) {
-      logs.push({
-        setNumber: i + 1,
-        reps: exercise.reps || '',
-        weight: exercise.weight || '',
-        completed: false
-      });
-    }
-    setSetLogs(logs);
-  };
-
-  const updateSetLog = (index: number, field: 'reps' | 'weight', value: string) => {
-    const updated = [...setLogs];
-    updated[index][field] = value;
-    setSetLogs(updated);
-  };
-
-  const toggleSetComplete = (index: number) => {
-    const updated = [...setLogs];
-    updated[index].completed = !updated[index].completed;
-    setSetLogs(updated);
-  };
-
-  const nextExercise = () => {
-    if (!workout) return;
-
-    if (currentExerciseIndex < workout.exercises.length - 1) {
-      setCurrentExerciseIndex(currentExerciseIndex + 1);
-      initializeSetLogs(workout.exercises[currentExerciseIndex + 1]);
-    } else {
-      // Workout complete
-      navigation.navigate('CompleteWorkout', { workoutId: workout._id });
-    }
-  };
-
-  const currentExercise = workout?.exercises[currentExerciseIndex];
-
-  if (!workout || !currentExercise) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.loadingText}>Loading workout...</Text>
-      </View>
+  const handleComplete = () => {
+    // Check if all sets are completed
+    const allCompleted = currentWorkout.exercises.every((ex: any) =>
+      ex.sets.every((set: any) => set.completed)
     );
+
+    if (!allCompleted) {
+      Alert.alert(
+        'Incomplete Workout',
+        'Not all sets are marked complete. Continue anyway?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Complete Anyway',
+            onPress: () => navigateToComplete()
+          }
+        ]
+      );
+    } else {
+      navigateToComplete();
+    }
+  };
+
+  const navigateToComplete = () => {
+  navigation.navigate('CompleteWorkout', {
+    workout: currentWorkout,
+    onComplete: () => {
+      // CHANGE THIS:
+      navigation.navigate('Main', { screen: 'DashboardTab' });
+      // OR BETTER:
+      navigation.popToTop(); // Goes back to dashboard
+    }
+  });
+};
+
+  if (!currentWorkout) {
+    return null;
   }
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← Back</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{workout.title}</Text>
+         <TouchableOpacity 
+                  style={styles.backButton}
+                  onPress={() => navigation.goBack()}
+                >
+                  <Text style={styles.backIcon}>←</Text>
+                </TouchableOpacity>
+        <View style={styles.headerContent}>
+          <Text style={styles.title}>{currentWorkout.title}</Text>
+        </View>
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-        {/* Exercise Info */}
-        <View style={styles.exerciseCard}>
-          <Text style={styles.exerciseName}>{currentExercise.name}</Text>
-          <Text style={styles.exerciseDetails}>
-            {currentExercise.sets} sets × {currentExercise.reps} reps
-          </Text>
-          <Text style={styles.progressText}>
-            Exercise {currentExerciseIndex + 1} of {workout.exercises.length}
-          </Text>
-        </View>
-
-        {/* Set Logging Table */}
-        <View style={styles.tableCard}>
-          <Text style={styles.tableTitle}>Log Your Sets</Text>
-          
-          {/* Table Header */}
-          <View style={styles.tableHeader}>
-            <Text style={[styles.tableHeaderText, styles.setColumn]}>Set</Text>
-            <Text style={[styles.tableHeaderText, styles.repsColumn]}>Reps</Text>
-            <Text style={[styles.tableHeaderText, styles.weightColumn]}>Weight</Text>
-            <Text style={[styles.tableHeaderText, styles.doneColumn]}>Done</Text>
-          </View>
-
-          {/* Table Rows */}
-          {setLogs.map((log, index) => (
-            <View key={index} style={styles.tableRow}>
-              <Text style={[styles.tableCell, styles.setColumn]}>{log.setNumber}</Text>
-              
-              <TextInput
-                style={[styles.tableCell, styles.repsColumn, styles.input]}
-                value={log.reps}
-                onChangeText={(value) => updateSetLog(index, 'reps', value)}
-                keyboardType="numeric"
-                placeholder="8-10"
-              />
-              
-              <TextInput
-                style={[styles.tableCell, styles.weightColumn, styles.input]}
-                value={log.weight}
-                onChangeText={(value) => updateSetLog(index, 'weight', value)}
-                keyboardType="numeric"
-                placeholder="60"
-              />
-              
-              <TouchableOpacity 
-                style={styles.doneColumn}
-                onPress={() => toggleSetComplete(index)}
+      <ScrollView style={styles.content}>
+        {/* Exercises */}
+        {currentWorkout.exercises.map((exercise: any, exerciseIndex: number) => (
+          <View key={exerciseIndex} style={styles.exerciseCard}>
+            <Text style={styles.exerciseName}>{exercise.name}</Text>
+            
+            {/* Sets */}
+            {exercise.sets.map((set: any, setIndex: number) => (
+              <TouchableOpacity
+                key={setIndex}
+                style={[
+                  styles.setRow,
+                  set.completed && styles.setRowCompleted
+                ]}
+                onPress={() => handleSetComplete(exerciseIndex, setIndex)}
               >
-                <View style={[styles.checkbox, log.completed && styles.checkboxChecked]}>
-                  {log.completed && <Text style={styles.checkmark}>✓</Text>}
+                <Text style={styles.setNumber}>Set {setIndex + 1}</Text>
+                <Text style={styles.setDetails}>
+                  {set.reps} reps {set.weight > 0 ? `@ ${set.weight}kg` : ''}
+                </Text>
+                <View style={[
+                  styles.checkbox,
+                  set.completed && styles.checkboxCompleted
+                ]}>
+                  {set.completed && <Text style={styles.checkmark}>✓</Text>}
                 </View>
               </TouchableOpacity>
-            </View>
-          ))}
-        </View>
+            ))}
+          </View>
+        ))}
 
-        {/* Action Buttons */}
-        <TouchableOpacity 
-          style={styles.nextButton}
-          onPress={nextExercise}
+        {/* Complete Button */}
+        <TouchableOpacity
+          style={styles.completeButton}
+          onPress={handleComplete}
         >
-          <Text style={styles.nextButtonText}>
-            {currentExerciseIndex < workout.exercises.length - 1 
-              ? 'Next Exercise' 
-              : 'Complete Workout'}
-          </Text>
+          <Text style={styles.completeButtonText}>Complete Workout</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -204,7 +138,7 @@ export const ExerciseProgressScreen = ({ route, navigation }: any) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background.lightGray
+    backgroundColor: colors.primary.dark
   },
   header: {
     flexDirection: 'row',
@@ -213,142 +147,101 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: 50,
     paddingBottom: spacing.md,
-    backgroundColor: colors.background.white,
+    backgroundColor: colors.primary.dark,
     borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
+    borderBottomColor: 'rgba(255,255,255,0.1)'
   },
-  backButton: {
-    fontSize: 16,
-    color: colors.accent.blue,
-    fontWeight: '600'
+   backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.accent.blue,
+    alignItems: 'center',
+    justifyContent: 'center'
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary,
+  backIcon: {
+    fontSize: 24,
+    color: colors.text.white,
+    fontWeight: 'bold'
+  },
+  headerContent: {
     flex: 1,
-    textAlign: 'center'
+    alignItems: 'center'
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: colors.text.white
   },
   placeholder: {
-    width: 50
+    width: 28
   },
   content: {
-    flex: 1
-  },
-  scrollContent: {
-    padding: spacing.lg,
-    paddingBottom: 100
-  },
-  loadingText: {
-    textAlign: 'center',
-    marginTop: spacing.xl * 2,
-    fontSize: 16,
-    color: colors.text.secondary
+    flex: 1,
+    padding: spacing.lg
   },
   exerciseCard: {
     backgroundColor: colors.background.white,
     borderRadius: borderRadius.medium,
     padding: spacing.lg,
-    marginBottom: spacing.lg,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.accent.blue
+    marginBottom: spacing.md
   },
   exerciseName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: spacing.xs
-  },
-  exerciseDetails: {
-    fontSize: 16,
-    color: colors.text.secondary,
-    marginBottom: spacing.sm
-  },
-  progressText: {
-    fontSize: 14,
-    color: colors.accent.blue,
-    fontWeight: '600'
-  },
-  tableCard: {
-    backgroundColor: colors.background.white,
-    borderRadius: borderRadius.medium,
-    padding: spacing.lg,
-    marginBottom: spacing.lg
-  },
-  tableTitle: {
     fontSize: 18,
-    fontWeight: '600',
+    fontWeight: 'bold',
     color: colors.text.primary,
     marginBottom: spacing.md
   },
-  tableHeader: {
+  setRow: {
     flexDirection: 'row',
-    paddingBottom: spacing.sm,
-    borderBottomWidth: 2,
-    borderBottomColor: colors.accent.blue,
-    marginBottom: spacing.sm
-  },
-  tableHeaderText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    textAlign: 'center'
-  },
-  tableRow: {
-    flexDirection: 'row',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray,
-    alignItems: 'center'
-  },
-  tableCell: {
-    fontSize: 16,
-    color: colors.text.primary,
-    textAlign: 'center'
-  },
-  setColumn: {
-    width: '15%'
-  },
-  repsColumn: {
-    width: '30%'
-  },
-  weightColumn: {
-    width: '30%'
-  },
-  doneColumn: {
-    width: '25%'
-  },
-  input: {
-    backgroundColor: colors.background.lightGray,
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
     borderRadius: borderRadius.small,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs
+    marginBottom: spacing.xs,
+    backgroundColor: colors.background.lightGray
+  },
+  setRowCompleted: {
+    backgroundColor: colors.accent.green + '20'
+  },
+  setNumber: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text.primary,
+    width: 60
+  },
+  setDetails: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.text.secondary
   },
   checkbox: {
     width: 24,
     height: 24,
-    borderRadius: 4,
+    borderRadius: 12,
     borderWidth: 2,
-    borderColor: colors.accent.blue,
+    borderColor: colors.text.secondary,
     alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center'
+    justifyContent: 'center'
   },
-  checkboxChecked: {
-    backgroundColor: colors.accent.blue
+  checkboxCompleted: {
+    backgroundColor: colors.accent.green,
+    borderColor: colors.accent.green
   },
   checkmark: {
     color: colors.text.white,
-    fontWeight: 'bold',
-    fontSize: 16
+    fontSize: 16,
+    fontWeight: 'bold'
   },
-  nextButton: {
+  completeButton: {
     backgroundColor: colors.accent.blue,
-    borderRadius: borderRadius.medium,
     padding: spacing.lg,
-    alignItems: 'center'
+    borderRadius: borderRadius.medium,
+    alignItems: 'center',
+    marginTop: spacing.lg,
+    marginBottom: spacing.xl
   },
-  nextButtonText: {
+  completeButtonText: {
     color: colors.text.white,
     fontSize: 18,
     fontWeight: 'bold'

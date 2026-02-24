@@ -19,20 +19,31 @@ const workoutSchema = new mongoose.Schema({
     type: String,
     required: true
   },
-  description: String,
-  category: {
-    type: String,
-    enum: ['Push', 'Pull', 'Legs', 'Cardio', 'Core', 'Full Body'],
-    default: 'Full Body'
-  },
-  exercises: [exerciseSchema],
+  exercises: [{
+    name: String,
+    sets: [{
+      reps: Number,
+      weight: Number,
+      completed: {
+        type: Boolean,
+        default: false
+      }
+    }]
+  }],
   rating: {
     type: Number,
     min: 1,
-    max: 5
+    max: 5,
+    default: null
   },
-  comment: String,
-  duration: Number, // minutes
+  comment: {
+    type: String,
+    default: ''
+  },
+  duration: {
+    type: Number,
+    default: 0
+  },
   isCompleted: {
     type: Boolean,
     default: false
@@ -41,10 +52,17 @@ const workoutSchema = new mongoose.Schema({
     type: Date,
     default: null
   },
-  createdAt: {
-    type: Date,
-    default: Date.now
+  // ADD THESE TEMPLATE FIELDS
+  isTemplate: {
+    type: Boolean,
+    default: false
+  },
+  templateName: {
+    type: String,
+    default: ''
   }
+}, {
+  timestamps: true
 });
 
 module.exports = mongoose.model('Workout', workoutSchema);

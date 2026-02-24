@@ -54,12 +54,13 @@ export const verseAPI = {
   }
 };
 
-// Workout API
 export const workoutAPI = {
-  // Get all workouts for user
+  // Get user's workouts
   getWorkouts: async (userId: string) => {
     try {
-      const response = await api.get(`/workouts?userId=${userId}`);
+      const response = await api.get('/workouts', {
+        params: { userId }
+      });
       return response.data;
     } catch (error: any) {
       console.error('Get workouts error:', error);
@@ -78,18 +79,23 @@ export const workoutAPI = {
     }
   },
 
-  // Create new workout
-  createWorkout: async (workoutData: any) => {
+  // Create workout
+  createWorkout: async (workout: any) => {
     try {
-      const response = await api.post('/workouts', workoutData);
+      console.log('📤 Sending workout to API:', JSON.stringify(workout, null, 2));
+      
+      const response = await api.post('/workouts', workout);
+      
+      console.log('✅ Workout created response:', response.data);
       return response.data;
     } catch (error: any) {
-      console.error('Create workout error:', error);
+      console.error('❌ Create workout error:', error);
+      console.error('Error response:', error.response?.data);
       throw error.response?.data || { error: 'Failed to create workout' };
     }
   },
 
-  // Update workout (during workout)
+  // Update workout
   updateWorkout: async (workoutId: string, updateData: any) => {
     try {
       const response = await api.put(`/workouts/${workoutId}`, updateData);
@@ -100,7 +106,21 @@ export const workoutAPI = {
     }
   },
 
-  // Complete workout with rating
+  // Update a specific set
+  updateSet: async (workoutId: string, exerciseIndex: number, setIndex: number, completed: boolean) => {
+    try {
+      const response = await api.put(
+        `/workouts/${workoutId}/exercises/${exerciseIndex}/sets/${setIndex}`,
+        { completed }
+      );
+      return response.data;
+    } catch (error: any) {
+      console.error('Update set error:', error);
+      throw error.response?.data || { error: 'Failed to update set' };
+    }
+  },
+
+  // Complete workout
   completeWorkout: async (workoutId: string, rating: number, comment: string) => {
     try {
       const response = await api.post(`/workouts/${workoutId}/complete`, {
@@ -122,6 +142,54 @@ export const workoutAPI = {
     } catch (error: any) {
       console.error('Delete workout error:', error);
       throw error.response?.data || { error: 'Failed to delete workout' };
+    }
+  },
+
+  // Get user's templates
+  getTemplates: async (userId: string) => {
+    try {
+      const response = await api.get('/workouts/templates', {
+        params: { userId }
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Get templates error:', error);
+      throw error.response?.data || { error: 'Failed to get templates' };
+    }
+  },
+
+  // Save workout as template
+  saveAsTemplate: async (workoutId: string, templateName: string) => {
+    try {
+      const response = await api.post(`/workouts/${workoutId}/save-template`, {
+        templateName
+      });
+      return response.data;
+    } catch (error: any) {
+      console.error('Save template error:', error);
+      throw error.response?.data || { error: 'Failed to save template' };
+    }
+  },
+
+  // Create workout from template
+  createFromTemplate: async (templateId: string) => {
+    try {
+      const response = await api.post(`/workouts/from-template/${templateId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Create from template error:', error);
+      throw error.response?.data || { error: 'Failed to create from template' };
+    }
+  },
+
+  // Delete template
+  deleteTemplate: async (templateId: string) => {
+    try {
+      const response = await api.delete(`/workouts/templates/${templateId}`);
+      return response.data;
+    } catch (error: any) {
+      console.error('Delete template error:', error);
+      throw error.response?.data || { error: 'Failed to delete template' };
     }
   }
 };

@@ -1,151 +1,164 @@
 import React from 'react';
-import { Platform, Text, View, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { colors, spacing } from '../theme/colors';
+import { useAuth } from '../context/AuthContext';
+
+// Import all screens
 import { LoginScreen } from '../screens/LoginScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
-import { ProfileScreen } from '../screens/ProfileScreen';
 import { SearchScreen } from '../screens/SearchScreen';
-import { ExerciseDetailScreen } from '../screens/ExerciseDetailScreen';
-import { CompleteWorkoutScreen } from '../screens/CompleteWorkoutScreen';
-import { ExerciseScreen } from '../screens/ExerciseScreen';
+import { ProfileScreen } from '../screens/ProfileScreen';
 import { HealthScreen } from '../screens/HealthScreen';
+import { ExerciseScreen } from '../screens/ExerciseScreen';
+import { ExerciseDetailScreen } from '../screens/ExerciseDetailScreen';
 import { ExerciseProgressScreen } from '../screens/ExerciseProgressScreen';
+import { CompleteWorkoutScreen } from '../screens/CompleteWorkoutScreen';
 import { NutritionScreen } from '../screens/NutritionScreen';
 import { AddFoodScreen } from '../screens/AddFoodScreen';
 import { CommunityScreen } from '../screens/CommunityScreen';
 import { CreatePostScreen } from '../screens/CreatePostScreen';
 import { PostDetailScreen } from '../screens/PostDetailScreen';
 import { EditProfileScreen } from '../screens/EditProfileScreen';
-import { useAuth } from '../context/AuthContext';
-import { colors } from '../theme/colors';
 import { ProgressChartsScreen } from '../screens/ProgressChartsScreen';
 import { WeeklyNutritionScreen } from '../screens/WeeklyNutritionScreen';
+import { WorkoutTemplatesScreen } from '../screens/WorkoutTemplatesScreen';
 
-
-
-const Stack = createNativeStackNavigator();
-const Tab = createNativeStackNavigator();
+const Stack = createStackNavigator();
+const Tab = createBottomTabNavigator();
 
 const MainTabs = () => {
+  const { user } = useAuth();
+
   return (
     <Tab.Navigator
-      initialRouteName="DashboardTab"  // ADD THIS LINE
-      screenOptions={({ route }) => ({
-        headerShown: true,
-        header: ({ navigation, route }) => {
-          const currentRoute = navigation.getState().routes[navigation.getState().index].name;
-          
-          return (
-            <View style={{
-              paddingTop: 50,
-              paddingBottom: 12,
-              paddingHorizontal: 20,
-              backgroundColor: colors.primary.dark,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.15,
-              shadowRadius: 4,
-              elevation: 4
-            }}>
-              {/* Logo */}
-              <Text style={{
-                fontSize: 24,
-                fontWeight: 'bold',
-                color: colors.text.white,
-                letterSpacing: 1
-              }}>
-                FFF
-              </Text>
-
-              {/* Navigation Pills */}
-              <View style={{
-                flexDirection: 'row',
-                gap: 6,
-                backgroundColor: 'rgba(255,255,255,0.1)',
-                borderRadius: 24,
-                padding: 4
-              }}>
-                <TouchableOpacity
-                  style={{
-                    paddingVertical: 6,
-                    paddingHorizontal: 14,
-                    borderRadius: 20,
-                    backgroundColor: currentRoute === 'SearchTab' ? colors.accent.blue : 'transparent'
-                  }}
+      screenOptions={{
+        headerShown: false,
+        tabBarStyle: { display: 'none', height: 0 },
+        tabBarButton: () => null
+      }}
+      initialRouteName="DashboardTab"
+    >
+      <Tab.Screen 
+        name="SearchTab" 
+        component={SearchScreen}
+        options={{
+          header: ({ navigation }) => (
+            <View style={styles.topNav}>
+              <Text style={styles.logo}>FFF</Text>
+              <View style={styles.navPills}>
+                <TouchableOpacity 
+                  style={styles.navPill}
                   onPress={() => navigation.navigate('SearchTab')}
                 >
-                  <Text style={{ fontSize: 20 }}>🔍</Text>
+                  <Text style={styles.navPillText}>🔍</Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={{
-                    paddingVertical: 6,
-                    paddingHorizontal: 14,
-                    borderRadius: 20,
-                    backgroundColor: currentRoute === 'DashboardTab' ? colors.accent.blue : 'transparent'
-                  }}
+                <TouchableOpacity 
+                  style={[styles.navPill, styles.navPillActive]}
                   onPress={() => navigation.navigate('DashboardTab')}
                 >
-                  <Text style={{ fontSize: 20 }}>🏠</Text>
+                  <Text style={styles.navPillText}>🏠</Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={{
-                    paddingVertical: 6,
-                    paddingHorizontal: 14,
-                    borderRadius: 20,
-                    backgroundColor: currentRoute === 'ProfileTab' ? colors.accent.blue : 'transparent'
-                  }}
+                <TouchableOpacity 
+                  style={styles.navPill}
                   onPress={() => navigation.navigate('ProfileTab')}
                 >
-                  <Text style={{ fontSize: 20 }}>👤</Text>
+                  <Text style={styles.navPillText}>👤</Text>
                 </TouchableOpacity>
               </View>
-
-              {/* Notification */}
-              <TouchableOpacity>
-                <Text style={{ fontSize: 24 }}>🔔</Text>
+              <TouchableOpacity style={styles.bellIcon}>
+                <Text style={styles.bellText}>🔔</Text>
               </TouchableOpacity>
             </View>
-          );
-        },
-        tabBarStyle: { display: 'none' }
-      })}
-    >
-      <Tab.Screen name="SearchTab" component={SearchScreen} />
-      <Tab.Screen name="DashboardTab" component={DashboardScreen} />
-      <Tab.Screen name="ProfileTab" component={ProfileScreen} />
+          )
+        }}
+      />
+      <Tab.Screen 
+        name="DashboardTab" 
+        component={DashboardScreen}
+        options={{
+          header: ({ navigation }) => (
+            <View style={styles.topNav}>
+              <Text style={styles.logo}>FFF</Text>
+              <View style={styles.navPills}>
+                <TouchableOpacity 
+                  style={styles.navPill}
+                  onPress={() => navigation.navigate('SearchTab')}
+                >
+                  <Text style={styles.navPillText}>🔍</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.navPill, styles.navPillActive]}
+                  onPress={() => navigation.navigate('DashboardTab')}
+                >
+                  <Text style={styles.navPillText}>🏠</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.navPill}
+                  onPress={() => navigation.navigate('ProfileTab')}
+                >
+                  <Text style={styles.navPillText}>👤</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity style={styles.bellIcon}>
+                <Text style={styles.bellText}>🔔</Text>
+              </TouchableOpacity>
+            </View>
+          )
+        }}
+      />
+      <Tab.Screen 
+        name="ProfileTab" 
+        component={ProfileScreen}
+        options={{
+          header: ({ navigation }) => (
+            <View style={styles.topNav}>
+              <Text style={styles.logo}>FFF</Text>
+              <View style={styles.navPills}>
+                <TouchableOpacity 
+                  style={styles.navPill}
+                  onPress={() => navigation.navigate('SearchTab')}
+                >
+                  <Text style={styles.navPillText}>🔍</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.navPill}
+                  onPress={() => navigation.navigate('DashboardTab')}
+                >
+                  <Text style={styles.navPillText}>🏠</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.navPill, styles.navPillActive]}
+                  onPress={() => navigation.navigate('ProfileTab')}
+                >
+                  <Text style={styles.navPillText}>👤</Text>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity style={styles.bellIcon}>
+                <Text style={styles.bellText}>🔔</Text>
+              </TouchableOpacity>
+            </View>
+          )
+        }}
+      />
     </Tab.Navigator>
   );
 };
 
 export const AppNavigator = () => {
-  const { user, isLoading } = useAuth();
-
-  console.log('AppNavigator render');
-  console.log('User:', user ? user.username : 'null');
-  console.log('Loading:', isLoading);
-
-  if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#001F3F' }}>
-        <ActivityIndicator size="large" color="#007BFF" />
-      </View>
-    );
-  }
+  const { user } = useAuth();
 
   return (
     <NavigationContainer>
       <Stack.Navigator 
-        screenOptions={{ headerShown: false }}
+        screenOptions={{
+          headerShown: false,
+          cardStyle: { backgroundColor: colors.primary.dark }
+        }}
       >
         {user ? (
-          // User is logged in - show app screens
           <>
             <Stack.Screen name="Main" component={MainTabs} />
             <Stack.Screen name="Health" component={HealthScreen} />
@@ -161,12 +174,61 @@ export const AppNavigator = () => {
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="ProgressCharts" component={ProgressChartsScreen} />
             <Stack.Screen name="WeeklyNutrition" component={WeeklyNutritionScreen} />
+            <Stack.Screen name="WorkoutTemplates" component={WorkoutTemplatesScreen} />
           </>
         ) : (
-          // User is not logged in - show only login
           <Stack.Screen name="Login" component={LoginScreen} />
         )}
       </Stack.Navigator>
     </NavigationContainer>
   );
 };
+
+const styles = StyleSheet.create({
+  topNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.primary.dark,
+    paddingHorizontal: spacing.lg,
+    paddingTop: 50,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)'
+  },
+  logo: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: colors.text.white
+  },
+  navPills: {
+    flexDirection: 'row',
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 25,
+    padding: 4,
+    gap: 4
+  },
+  navPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'transparent'
+  },
+  navPillActive: {
+    backgroundColor: colors.accent.blue
+  },
+  navPillText: {
+    fontSize: 18
+  },
+  bellIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  bellText: {
+    fontSize: 20
+  }
+});

@@ -10,7 +10,16 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#ffffff",
+    "plugins": [
+      [
+        "react-native-health-connect",
+        {
+          "permissions": [
+            "Steps", "HeartRate", "Weight", "SleepSession", "ActiveCaloriesBurned"]
+        }
+      ]
+    ]  
     },
     "ios": {
       "supportsTablet": true,

@@ -2,6 +2,7 @@ import {
   initialize,
   requestPermission,
   readRecords,
+  getGrantedPermissions,
 } from 'react-native-health-connect';
 
 export const initHealthConnect = async (): Promise<boolean> => {
@@ -10,14 +11,20 @@ export const initHealthConnect = async (): Promise<boolean> => {
 };
 
 export const requestHealthPermissions = async () => {
-  const permissions = await requestPermission([
-    { accessType: 'read', recordType: 'Steps' },
-    { accessType: 'read', recordType: 'HeartRate' },
-    { accessType: 'read', recordType: 'Weight' },
-    { accessType: 'read', recordType: 'SleepSession' },
-    { accessType: 'read', recordType: 'ActiveCaloriesBurned' },
-  ]);
-  return permissions;
+  const granted = await getGrantedPermissions();
+  const grantedTypes = granted.map((p: any) => p.recordType);
+
+  const needed = [
+    { accessType: 'read' as const, recordType: 'Steps' },
+    { accessType: 'read' as const, recordType: 'HeartRate' },
+    { accessType: 'read' as const, recordType: 'Weight' },
+    { accessType: 'read' as const, recordType: 'SleepSession' },
+    { accessType: 'read' as const, recordType: 'ActiveCaloriesBurned' },
+  ].filter(p => !grantedTypes.includes(p.recordType));
+
+  if (needed.length > 0) {
+    await requestPermission(needed);
+  }
 };
 
 export const fetchHealthData = async () => {
@@ -25,26 +32,26 @@ export const fetchHealthData = async () => {
   const startOfDay = new Date(now);
   startOfDay.setHours(0, 0, 0, 0);
 
-  const timeRangeFilter = {
+  const todayFilter = {
     operator: 'between' as const,
     startTime: startOfDay.toISOString(),
     endTime: now.toISOString(),
   };
 
   // Steps
-  const stepsData = await readRecords('Steps', { timeRangeFilter });
-  const totalSteps = stepsData.records.reduce((sum, r) => sum + r.count, 0);
+  const stepsData = await readRecords('Steps', { timeRangeFilter: todayFilter });
+  const totalSteps = stepsData.records.reduce((sum: number, r: any) => sum + r.count, 0);
 
   // Heart Rate (latest)
-  const hrData = await readRecords('HeartRate', { timeRangeFilter });
+  const hrData = await readRecords('HeartRate', { timeRangeFilter: todayFilter });
   const latestHR = hrData.records.at(-1)?.samples?.at(-1)?.beatsPerMinute ?? null;
 
-  // Weight (latest in last 30 days)
+  // Weight (last 30 days)
   const weightStart = new Date(now);
   weightStart.setDate(weightStart.getDate() - 30);
   const weightData = await readRecords('Weight', {
     timeRangeFilter: {
-      operator: 'between',
+      operator: 'between' as const,
       startTime: weightStart.toISOString(),
       endTime: now.toISOString(),
     },
@@ -57,20 +64,20 @@ export const fetchHealthData = async () => {
   sleepStart.setHours(20, 0, 0, 0);
   const sleepData = await readRecords('SleepSession', {
     timeRangeFilter: {
-      operator: 'between',
+      operator: 'between' as const,
       startTime: sleepStart.toISOString(),
       endTime: now.toISOString(),
     },
   });
-  const sleepHours = sleepData.records.reduce((sum, r) => {
+  const sleepHours = sleepData.records.reduce((sum: number, r: any) => {
     const ms = new Date(r.endTime).getTime() - new Date(r.startTime).getTime();
     return sum + ms / 3600000;
   }, 0);
 
   // Calories
-  const caloriesData = await readRecords('ActiveCaloriesBurned', { timeRangeFilter });
+  const caloriesData = await readRecords('ActiveCaloriesBurned', { timeRangeFilter: todayFilter });
   const totalCalories = caloriesData.records.reduce(
-    (sum, r) => sum + r.energy.inKilocalories, 0
+    (sum: number, r: any) => sum + r.energy.inKilocalories, 0
   );
 
   return {

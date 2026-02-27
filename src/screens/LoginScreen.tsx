@@ -6,7 +6,8 @@ import {
   TouchableOpacity, 
   StyleSheet, 
   Alert,
-  ActivityIndicator 
+  ActivityIndicator,
+  Image
 } from 'react-native';
 import { colors, spacing, borderRadius } from '../theme/colors';
 import { authAPI } from '../services/api';
@@ -21,47 +22,27 @@ export const LoginScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-  if (!email || !password) {
-    Alert.alert('Error', 'Please enter email and password');
-    return;
-  }
-
-  setLoading(true);
-  console.log('=== LOGIN ATTEMPT ===');
-  console.log('Email:', email);
-  
-  try {
-    console.log('Calling authAPI.login...');
-    const data = await authAPI.login(email, password);
-    
-    console.log('Received data:', JSON.stringify(data, null, 2));
-    console.log('Token exists?', !!data?.token);
-    console.log('User exists?', !!data?.user);
-    
-    if (data?.token && data?.user) {
-      console.log('Token:', data.token.substring(0, 20) + '...');
-      console.log('User:', data.user);
-      
-      await saveAuth(data.token, data.user);
-      Alert.alert('Success', 'Welcome back!');
-      navigation.navigate('Main');
-    } else {
-      console.error('Missing token or user in response');
-      console.error('Full response:', data);
-      Alert.alert('Error', 'Server response was incomplete');
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter email and password');
+      return;
     }
-  } catch (err: any) {
-    console.error('=== LOGIN ERROR ===');
-    console.error('Error type:', typeof err);
-    console.error('Error:', err);
-    console.error('Error message:', err?.error || err?.message);
-    
-    const message = err?.error || err?.message || 'Login failed - check backend';
-    Alert.alert('Error', message);
-  } finally {
-    setLoading(false);
-  }
-};
+    setLoading(true);
+    try {
+      const data = await authAPI.login(email, password);
+      if (data?.token && data?.user) {
+        await saveAuth(data.token, data.user);
+        Alert.alert('Success', 'Welcome back!');
+        // NO navigation.navigate here
+      } else {
+        Alert.alert('Error', 'Server response was incomplete');
+      }
+    } catch (err: any) {
+      Alert.alert('Error Detail', JSON.stringify(err?.response?.data || err?.message || err));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSignUp = async () => {
     if (!email || !username || !password) {
       Alert.alert('Error', 'Please fill in all fields');
@@ -90,8 +71,12 @@ export const LoginScreen = ({ navigation }: any) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.logo}>FFF</Text>
-        <Text style={styles.tagline}>Faith. Fitness. Fuel.</Text>
+        <Image
+          source={require('../../assets/mainlogo.png')}
+          style={styles.logo}
+          resizeMode="cover"
+        />
+        <Text style={styles.tagline}>One Hub. Infinite Possibilities.</Text>
       </View>
 
       <View style={styles.form}>
@@ -164,20 +149,25 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     justifyContent: 'center'
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: spacing.xl * 2
-  },
-  logo: {
-    fontSize: 64,
-    fontWeight: 'bold',
-    color: colors.text.white,
-    marginBottom: spacing.sm
-  },
+ header: {
+   alignItems: 'center',
+   marginBottom: 0,        // ← was spacing.xl * 2
+   paddingBottom: 0,
+ },
+
+ logo: {
+   width: '100%',
+   height: 120,            // ← reduce height to remove black space
+   marginBottom: 24,       // ← controlled gap to inputs
+   resizeMode: 'contain',
+ },
   tagline: {
-    fontSize: 18,
-    color: colors.text.white,
-    opacity: 0.9
+    color: '#ffffff',
+    fontSize: 14,
+    letterSpacing: 1.5,
+    textAlign: 'center',
+    marginBottom: 32,
+    fontStyle: 'italic',
   },
   form: {
     marginBottom: spacing.xl

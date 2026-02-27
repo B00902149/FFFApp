@@ -14,6 +14,7 @@ import {
   Platform,
 } from 'react-native';
 import * as HealthConnect from '../services/healthConnect';
+import { useDailyQuote } from '../hooks/useDailyQuote';
 
 type HealthData = {
   steps: number;
@@ -29,10 +30,10 @@ const TILES = [
   { key: 'heartRate', label: 'BPM',       icon: '❤️',  color: '#FF6B6B', suffix: 'bpm',   placeholder: 'e.g. 68' },
   { key: 'steps',     label: 'ACTIVITY',  icon: '👟',  color: '#4ECDC4', suffix: 'steps', placeholder: 'e.g. 8500' },
   { key: 'calories',  label: 'CALORIES',  icon: '🔥',  color: '#FF9F43', suffix: 'kcal',  placeholder: 'e.g. 1800' },
-  { key: 'energy',    label: 'ENERGY',    icon: '⚡',  color: '#FFD700', suffix: '/10',   placeholder: 'e.g. 8' },  // ← ADD THIS
 ];
 
 export const HealthScreen = ({ navigation }: any) => {
+  const quote = useDailyQuote();
   const [data, setData] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -136,10 +137,8 @@ export const HealthScreen = ({ navigation }: any) => {
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         {/* Faith verse */}
         <View style={styles.verseCard}>
-          <Text style={styles.verseText}>
-            "Your body is a temple of the Holy Spirit"
-          </Text>
-          <Text style={styles.verseRef}>— 1 Corinthians 6:19</Text>
+          <Text style={styles.verseText}>"{quote.text}"</Text>
+          <Text style={styles.verseRef}>— {quote.author}</Text>
         </View>
 
         {/* Tiles */}

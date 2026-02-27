@@ -1,208 +1,67 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
-import { colors, spacing, borderRadius } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { workoutAPI } from '../services/api';
+import { useDailyQuote } from '../hooks/useDailyQuote';
+
+const WORKOUTS = [
+  {
+    id: 1, title: 'Upper Body Strength', description: 'Chest, shoulders & triceps',
+    emoji: '💪', color: '#4A9EFF', duration: 45,
+    exercises: [
+      { name: 'Bench Press',           sets: [{ reps: 10, weight: 60, completed: false }, { reps: 10, weight: 60, completed: false }, { reps: 8, weight: 65, completed: false }, { reps: 8, weight: 65, completed: false }] },
+      { name: 'Overhead Press',        sets: [{ reps: 10, weight: 40, completed: false }, { reps: 10, weight: 40, completed: false }, { reps: 10, weight: 40, completed: false }] },
+      { name: 'Incline Dumbbell Press',sets: [{ reps: 12, weight: 20, completed: false }, { reps: 12, weight: 20, completed: false }, { reps: 12, weight: 20, completed: false }] },
+      { name: 'Tricep Dips',           sets: [{ reps: 12, weight: 0,  completed: false }, { reps: 12, weight: 0,  completed: false }, { reps: 10, weight: 0,  completed: false }] },
+    ]
+  },
+  {
+    id: 2, title: 'Lower Body Power', description: 'Squats, deadlifts & leg work',
+    emoji: '🦵', color: '#4ECDC4', duration: 50,
+    exercises: [
+      { name: 'Barbell Squats',       sets: [{ reps: 8,  weight: 80,  completed: false }, { reps: 8,  weight: 80,  completed: false }, { reps: 8,  weight: 80,  completed: false }, { reps: 6, weight: 85, completed: false }] },
+      { name: 'Romanian Deadlifts',   sets: [{ reps: 10, weight: 60,  completed: false }, { reps: 10, weight: 60,  completed: false }, { reps: 10, weight: 60,  completed: false }] },
+      { name: 'Leg Press',            sets: [{ reps: 12, weight: 100, completed: false }, { reps: 12, weight: 100, completed: false }, { reps: 12, weight: 100, completed: false }] },
+      { name: 'Leg Curls',            sets: [{ reps: 12, weight: 30,  completed: false }, { reps: 12, weight: 30,  completed: false }, { reps: 12, weight: 30,  completed: false }] },
+    ]
+  },
+  {
+    id: 3, title: 'Back & Biceps', description: 'Pull exercises & arms',
+    emoji: '🏋️', color: '#7B6FFF', duration: 45,
+    exercises: [
+      { name: 'Pull-ups',      sets: [{ reps: 8,  weight: 0,  completed: false }, { reps: 8,  weight: 0,  completed: false }, { reps: 6,  weight: 0,    completed: false }] },
+      { name: 'Barbell Rows',  sets: [{ reps: 10, weight: 50, completed: false }, { reps: 10, weight: 50, completed: false }, { reps: 10, weight: 50,   completed: false }] },
+      { name: 'Lat Pulldown',  sets: [{ reps: 12, weight: 45, completed: false }, { reps: 12, weight: 45, completed: false }, { reps: 12, weight: 45,   completed: false }] },
+      { name: 'Bicep Curls',   sets: [{ reps: 12, weight: 15, completed: false }, { reps: 12, weight: 15, completed: false }, { reps: 10, weight: 17.5, completed: false }] },
+    ]
+  },
+  {
+    id: 4, title: 'Full Body HIIT', description: 'High intensity conditioning',
+    emoji: '🔥', color: '#FF6B6B', duration: 30,
+    exercises: [
+      { name: 'Burpees',          sets: [{ reps: 15, weight: 0, completed: false }, { reps: 15, weight: 0, completed: false }, { reps: 15, weight: 0, completed: false }] },
+      { name: 'Push-ups',         sets: [{ reps: 20, weight: 0, completed: false }, { reps: 20, weight: 0, completed: false }, { reps: 15, weight: 0, completed: false }] },
+      { name: 'Mountain Climbers',sets: [{ reps: 30, weight: 0, completed: false }, { reps: 30, weight: 0, completed: false }, { reps: 30, weight: 0, completed: false }] },
+      { name: 'Jump Squats',      sets: [{ reps: 15, weight: 0, completed: false }, { reps: 15, weight: 0, completed: false }, { reps: 15, weight: 0, completed: false }] },
+    ]
+  },
+];
 
 export const ExerciseScreen = ({ navigation }: any) => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(false);
-
-  const predefinedWorkouts = [
-    {
-      id: 1,
-      title: 'Upper Body Strength',
-      description: 'Chest, shoulders, and triceps',
-      emoji: '💪',
-      exercises: [
-        {
-          name: 'Bench Press',
-          sets: [
-            { reps: 10, weight: 60, completed: false },
-            { reps: 10, weight: 60, completed: false },
-            { reps: 8, weight: 65, completed: false },
-            { reps: 8, weight: 65, completed: false }
-          ]
-        },
-        {
-          name: 'Overhead Press',
-          sets: [
-            { reps: 10, weight: 40, completed: false },
-            { reps: 10, weight: 40, completed: false },
-            { reps: 10, weight: 40, completed: false }
-          ]
-        },
-        {
-          name: 'Incline Dumbbell Press',
-          sets: [
-            { reps: 12, weight: 20, completed: false },
-            { reps: 12, weight: 20, completed: false },
-            { reps: 12, weight: 20, completed: false }
-          ]
-        },
-        {
-          name: 'Tricep Dips',
-          sets: [
-            { reps: 12, weight: 0, completed: false },
-            { reps: 12, weight: 0, completed: false },
-            { reps: 10, weight: 0, completed: false }
-          ]
-        }
-      ]
-    },
-    {
-      id: 2,
-      title: 'Lower Body Power',
-      description: 'Squats, deadlifts, and leg work',
-      emoji: '🦵',
-      exercises: [
-        {
-          name: 'Barbell Squats',
-          sets: [
-            { reps: 8, weight: 80, completed: false },
-            { reps: 8, weight: 80, completed: false },
-            { reps: 8, weight: 80, completed: false },
-            { reps: 6, weight: 85, completed: false }
-          ]
-        },
-        {
-          name: 'Romanian Deadlifts',
-          sets: [
-            { reps: 10, weight: 60, completed: false },
-            { reps: 10, weight: 60, completed: false },
-            { reps: 10, weight: 60, completed: false }
-          ]
-        },
-        {
-          name: 'Leg Press',
-          sets: [
-            { reps: 12, weight: 100, completed: false },
-            { reps: 12, weight: 100, completed: false },
-            { reps: 12, weight: 100, completed: false }
-          ]
-        },
-        {
-          name: 'Leg Curls',
-          sets: [
-            { reps: 12, weight: 30, completed: false },
-            { reps: 12, weight: 30, completed: false },
-            { reps: 12, weight: 30, completed: false }
-          ]
-        }
-      ]
-    },
-    {
-      id: 3,
-      title: 'Back & Biceps',
-      description: 'Pull exercises and arms',
-      emoji: '🏋️',
-      exercises: [
-        {
-          name: 'Pull-ups',
-          sets: [
-            { reps: 8, weight: 0, completed: false },
-            { reps: 8, weight: 0, completed: false },
-            { reps: 6, weight: 0, completed: false }
-          ]
-        },
-        {
-          name: 'Barbell Rows',
-          sets: [
-            { reps: 10, weight: 50, completed: false },
-            { reps: 10, weight: 50, completed: false },
-            { reps: 10, weight: 50, completed: false }
-          ]
-        },
-        {
-          name: 'Lat Pulldown',
-          sets: [
-            { reps: 12, weight: 45, completed: false },
-            { reps: 12, weight: 45, completed: false },
-            { reps: 12, weight: 45, completed: false }
-          ]
-        },
-        {
-          name: 'Bicep Curls',
-          sets: [
-            { reps: 12, weight: 15, completed: false },
-            { reps: 12, weight: 15, completed: false },
-            { reps: 10, weight: 17.5, completed: false }
-          ]
-        }
-      ]
-    },
-    {
-      id: 4,
-      title: 'Full Body HIIT',
-      description: 'High intensity conditioning',
-      emoji: '🔥',
-      exercises: [
-        {
-          name: 'Burpees',
-          sets: [
-            { reps: 15, weight: 0, completed: false },
-            { reps: 15, weight: 0, completed: false },
-            { reps: 15, weight: 0, completed: false }
-          ]
-        },
-        {
-          name: 'Push-ups',
-          sets: [
-            { reps: 20, weight: 0, completed: false },
-            { reps: 20, weight: 0, completed: false },
-            { reps: 15, weight: 0, completed: false }
-          ]
-        },
-        {
-          name: 'Mountain Climbers',
-          sets: [
-            { reps: 30, weight: 0, completed: false },
-            { reps: 30, weight: 0, completed: false },
-            { reps: 30, weight: 0, completed: false }
-          ]
-        },
-        {
-          name: 'Jump Squats',
-          sets: [
-            { reps: 15, weight: 0, completed: false },
-            { reps: 15, weight: 0, completed: false },
-            { reps: 15, weight: 0, completed: false }
-          ]
-        }
-      ]
-    }
-  ];
+  const quote = useDailyQuote();
+  const [loadingId, setLoadingId] = useState<number | null>(null);
 
   const handleStartWorkout = async (workout: any) => {
     try {
-      if (!user?.id) {
-        Alert.alert('Error', 'Please login to start a workout');
-        return;
-      }
-
-      setLoading(true);
-
-      // Create workout in database
-      const newWorkout = {
-        userId: user.id,
-        title: workout.title,
-        exercises: workout.exercises
-      };
-
-      console.log('Creating workout:', newWorkout);
-
-      const createdWorkout = await workoutAPI.createWorkout(newWorkout);
-      
-      setLoading(false);
-
-      // Navigate to progress screen
-      navigation.navigate('ExerciseProgress', { 
-        workout: createdWorkout
-      });
-    } catch (error) {
-      console.error('Failed to start workout:', error);
-      setLoading(false);
+      if (!user?.id) { Alert.alert('Error', 'Please login to start a workout'); return; }
+      setLoadingId(workout.id);
+      const createdWorkout = await workoutAPI.createWorkout({ userId: user.id, title: workout.title, exercises: workout.exercises });
+      navigation.navigate('ExerciseProgress', { workout: createdWorkout });
+    } catch {
       Alert.alert('Error', 'Failed to start workout. Please try again.');
+    } finally {
+      setLoadingId(null);
     }
   };
 
@@ -210,288 +69,165 @@ export const ExerciseScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backIcon}>←</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
-        
-        <Text style={styles.headerTitle}>Workouts</Text>
-        
-        <TouchableOpacity 
-          style={styles.templatesButton}
+        <Text style={styles.title}>WORKOUTS</Text>
+        <TouchableOpacity
+          style={styles.templatesBtn}
           onPress={() => navigation.navigate('WorkoutTemplates')}
         >
-          <Text style={styles.templatesButtonText}>📋</Text>
+          <Text style={styles.templatesBtnText}>📋</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* Faith Motivation */}
-        <View style={styles.motivationCard}>
-          <Text style={styles.motivationText}>
-            "I can do all things through Christ who strengthens me"
-          </Text>
-          <Text style={styles.motivationRef}>Philippians 4:13</Text>
-        </View>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+        {/* Faith Card */}
+                <View style={styles.faithCard}>
+                  <Text style={styles.faithText}>"{quote.text}"</Text>
+                  <Text style={styles.faithRef}>— {quote.author}</Text>
+                </View>
 
         {/* Workout Cards */}
-        <View style={styles.workoutsContainer}>
-          {predefinedWorkouts.map((workout) => (
-            <TouchableOpacity
-              key={workout.id}
-              style={styles.workoutCard}
-              onPress={() => handleStartWorkout(workout)}
-              disabled={loading}
-            >
-              <View style={styles.workoutHeader}>
+        {WORKOUTS.map((workout) => {
+          const totalSets = workout.exercises.reduce((t, e) => t + e.sets.length, 0);
+          const isLoading = loadingId === workout.id;
+          return (
+            <View key={workout.id} style={[styles.workoutCard, { borderTopColor: workout.color }]}>
+              {/* Card Header */}
+              <View style={styles.cardHeader}>
                 <Text style={styles.workoutEmoji}>{workout.emoji}</Text>
                 <View style={styles.workoutInfo}>
                   <Text style={styles.workoutTitle}>{workout.title}</Text>
-                  <Text style={styles.workoutDescription}>{workout.description}</Text>
+                  <Text style={styles.workoutDesc}>{workout.description}</Text>
                 </View>
               </View>
 
-              <View style={styles.workoutStats}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>{workout.exercises.length}</Text>
-                  <Text style={styles.statLabel}>exercises</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>
-                    {workout.exercises.reduce((total, ex) => total + ex.sets.length, 0)}
+              {/* Stats */}
+              <View style={styles.statsRow}>
+                {[
+                  { value: workout.exercises.length, label: 'exercises' },
+                  { value: totalSets,                label: 'sets' },
+                  { value: `~${workout.duration}`,   label: 'mins' },
+                ].map((stat, i) => (
+                  <React.Fragment key={stat.label}>
+                    <View style={styles.statItem}>
+                      <Text style={[styles.statValue, { color: workout.color }]}>{stat.value}</Text>
+                      <Text style={styles.statLabel}>{stat.label}</Text>
+                    </View>
+                    {i < 2 && <View style={styles.statDivider} />}
+                  </React.Fragment>
+                ))}
+              </View>
+
+              {/* Exercises Preview */}
+              <View style={styles.exercisePreview}>
+                {workout.exercises.map((ex, i) => (
+                  <Text key={i} style={styles.exerciseItem}>
+                    · {ex.name} <Text style={styles.exerciseSets}>({ex.sets.length} sets)</Text>
                   </Text>
-                  <Text style={styles.statLabel}>sets</Text>
-                </View>
-                <View style={styles.statDivider} />
-                <View style={styles.statItem}>
-                  <Text style={styles.statValue}>~45</Text>
-                  <Text style={styles.statLabel}>mins</Text>
-                </View>
+                ))}
               </View>
 
-              <View style={styles.startButtonContainer}>
-                {loading ? (
-                  <ActivityIndicator size="small" color={colors.accent.blue} />
+              {/* Start Button */}
+              <TouchableOpacity
+                style={[styles.startBtn, { backgroundColor: workout.color }]}
+                onPress={() => handleStartWorkout(workout)}
+                disabled={!!loadingId}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" size="small" />
                 ) : (
-                  <>
-                    <Text style={styles.startButtonText}>Start Workout</Text>
-                    <Text style={styles.startButtonIcon}>▶️</Text>
-                  </>
+                  <Text style={styles.startBtnText}>Start Workout  ▶</Text>
                 )}
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
+              </TouchableOpacity>
+            </View>
+          );
+        })}
 
         {/* Templates Link */}
         <TouchableOpacity
           style={styles.templatesCard}
           onPress={() => navigation.navigate('WorkoutTemplates')}
         >
-          <Text style={styles.templatesIcon}>📋</Text>
-          <View style={styles.templatesContent}>
-            <Text style={styles.templatesTitle}>My Templates</Text>
-            <Text style={styles.templatesSubtitle}>View saved workout routines</Text>
+          <Text style={styles.templatesCardIcon}>📋</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.templatesCardTitle}>My Templates</Text>
+            <Text style={styles.templatesCardSub}>View saved workout routines</Text>
           </View>
-          <Text style={styles.templatesArrow}>›</Text>
+          <Text style={styles.templatesCardArrow}>›</Text>
         </TouchableOpacity>
 
-        <View style={styles.bottomSpacer} />
+        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.primary.dark
-  },
+  container: { flex: 1, backgroundColor: '#0a1628' },
+
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: 50,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.primary.dark,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)'
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingTop: 56, paddingBottom: 16, paddingHorizontal: 20,
+    backgroundColor: '#0d1f3c', borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.accent.blue,
-    alignItems: 'center',
-    justifyContent: 'center'
+  backBtn: { width: 60 },
+  backText: { color: '#4A9EFF', fontSize: 16, fontWeight: '600' },
+  title: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 2 },
+  templatesBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#1a3a6b', alignItems: 'center', justifyContent: 'center',
   },
-  backIcon: {
-    fontSize: 24,
-    color: colors.text.white,
-    fontWeight: 'bold'
+  templatesBtnText: { fontSize: 20 },
+
+  content: { padding: 16, paddingBottom: 40 },
+
+  faithCard: {
+    backgroundColor: '#0d1f3c', borderRadius: 16, padding: 18,
+    marginBottom: 16, borderLeftWidth: 3, borderLeftColor: '#4A9EFF',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text.white,
-    flex: 1,
-    textAlign: 'center'
-  },
-  templatesButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  templatesButtonText: {
-    fontSize: 20
-  },
-  content: {
-    flex: 1
-  },
-  motivationCard: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    padding: spacing.lg,
-    margin: spacing.lg,
-    borderRadius: borderRadius.medium,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.accent.blue
-  },
-  motivationText: {
-    fontSize: 16,
-    fontStyle: 'italic',
-    color: colors.text.white,
-    marginBottom: spacing.xs,
-    lineHeight: 24
-  },
-  motivationRef: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.accent.blue,
-    textAlign: 'right'
-  },
-  workoutsContainer: {
-    padding: spacing.lg,
-    gap: spacing.md
-  },
+  faithText: { color: '#c8d8f0', fontSize: 14, fontStyle: 'italic', lineHeight: 22, marginBottom: 8 },
+  faithRef: { color: '#4A9EFF', fontSize: 12, fontWeight: '700', textAlign: 'right' },
+
   workoutCard: {
-    backgroundColor: colors.background.white,
-    borderRadius: borderRadius.medium,
-    padding: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
+    backgroundColor: '#0d1f3c', borderRadius: 16,
+    padding: 18, marginBottom: 14,
+    borderTopWidth: 3, elevation: 4,
   },
-  workoutHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  workoutEmoji: { fontSize: 40, marginRight: 14 },
+  workoutInfo: { flex: 1 },
+  workoutTitle: { color: '#fff', fontSize: 18, fontWeight: '800', marginBottom: 4 },
+  workoutDesc: { color: '#5a7fa8', fontSize: 13 },
+
+  statsRow: {
+    flexDirection: 'row', backgroundColor: '#0a1628',
+    borderRadius: 12, padding: 14, marginBottom: 14,
   },
-  workoutEmoji: {
-    fontSize: 40,
-    marginRight: spacing.md
+  statItem: { flex: 1, alignItems: 'center' },
+  statValue: { fontSize: 22, fontWeight: '800', marginBottom: 2 },
+  statLabel: { color: '#5a7fa8', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  statDivider: { width: 1, backgroundColor: '#1a3a6b', marginHorizontal: 8 },
+
+  exercisePreview: { marginBottom: 16 },
+  exerciseItem: { color: '#8ab4f8', fontSize: 13, marginBottom: 4 },
+  exerciseSets: { color: '#5a7fa8', fontSize: 12 },
+
+  startBtn: {
+    borderRadius: 12, padding: 14,
+    alignItems: 'center', justifyContent: 'center',
   },
-  workoutInfo: {
-    flex: 1
-  },
-  workoutTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: 4
-  },
-  workoutDescription: {
-    fontSize: 14,
-    color: colors.text.secondary
-  },
-  workoutStats: {
-    flexDirection: 'row',
-    backgroundColor: colors.background.lightGray,
-    borderRadius: borderRadius.small,
-    padding: spacing.md,
-    marginBottom: spacing.md
-  },
-  statItem: {
-    flex: 1,
-    alignItems: 'center'
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.accent.blue,
-    marginBottom: 2
-  },
-  statLabel: {
-    fontSize: 12,
-    color: colors.text.secondary
-  },
-  statDivider: {
-    width: 1,
-    height: '100%',
-    backgroundColor: colors.background.lightGray,
-    marginHorizontal: spacing.sm
-  },
-  startButtonContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.accent.blue,
-    padding: spacing.md,
-    borderRadius: borderRadius.small
-  },
-  startButtonText: {
-    color: colors.text.white,
-    fontSize: 16,
-    fontWeight: '600',
-    marginRight: spacing.sm
-  },
-  startButtonIcon: {
-    fontSize: 16
-  },
+  startBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+
   templatesCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.95)',
-    marginHorizontal: spacing.lg,
-    marginBottom: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: borderRadius.medium,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#0d1f3c', borderRadius: 16,
+    padding: 18, borderTopWidth: 3, borderTopColor: '#26de81',
   },
-  templatesIcon: {
-    fontSize: 32,
-    marginRight: spacing.md
-  },
-  templatesContent: {
-    flex: 1
-  },
-  templatesTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 2
-  },
-  templatesSubtitle: {
-    fontSize: 13,
-    color: colors.text.secondary
-  },
-  templatesArrow: {
-    fontSize: 28,
-    color: colors.text.secondary
-  },
-  bottomSpacer: {
-    height: 40
-  }
+  templatesCardIcon: { fontSize: 28, marginRight: 14 },
+  templatesCardTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  templatesCardSub: { color: '#5a7fa8', fontSize: 13 },
+  templatesCardArrow: { fontSize: 32, color: '#4A9EFF' },
 });

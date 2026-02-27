@@ -1,327 +1,220 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
-import { colors, spacing, borderRadius } from '../theme/colors';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, StyleSheet, FlatList, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { exerciseDB, Exercise } from '../services/exerciseDB';
+
+const FILTERS = [
+  { id: 'all',                   label: 'All' },
+  { id: 'strength',              label: 'Strength' },
+  { id: 'cardio',                label: 'Cardio' },
+  { id: 'stretching',            label: 'Stretching' },
+  { id: 'plyometrics',           label: 'Plyometrics' },
+  { id: 'powerlifting',          label: 'Powerlifting' },
+  { id: 'olympic_weightlifting', label: 'Olympic' },
+];
+
+const LEVEL_COLORS: Record<string, string> = {
+  beginner:     '#26de81',
+  intermediate: '#FF9F43',
+  expert:       '#FF6B6B',
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  strength:             '#4A9EFF',
+  cardio:               '#FF6B6B',
+  stretching:           '#26de81',
+  plyometrics:          '#FF9F43',
+  powerlifting:         '#7B6FFF',
+  olympic_weightlifting:'#FFD700',
+};
 
 export const SearchScreen = ({ navigation }: any) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedFilter, setSelectedFilter] = useState('all');
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [results, setResults] = useState<Exercise[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searching, setSearching] = useState(false);
 
-  const exercises = [
-    { id: '1', name: 'Bench Press', category: 'push', rating: 4.5, reviews: 234 },
-    { id: '2', name: 'Barbell Row', category: 'pull', rating: 4.7, reviews: 189 },
-    { id: '3', name: 'Squats', category: 'legs', rating: 4.8, reviews: 312 },
-    { id: '4', name: 'Deadlift', category: 'pull', rating: 4.6, reviews: 267 },
-    { id: '5', name: 'Overhead Press', category: 'push', rating: 4.4, reviews: 156 },
-    { id: '6', name: 'Pull-ups', category: 'pull', rating: 4.9, reviews: 198 },
-    { id: '7', name: 'Running', category: 'cardio', rating: 4.3, reviews: 445 },
-    { id: '8', name: 'Plank', category: 'core', rating: 4.6, reviews: 223 }
-  ];
+  useEffect(() => {
+    const init = async () => {
+      setLoading(true);
+      const data = await exerciseDB.search('', 'all');
+      setResults(data);
+      setLoading(false);
+    };
+    init();
+  }, []);
 
-  const filters = [
-    { id: 'all', label: 'All' },
-    { id: 'push', label: 'Push' },
-    { id: 'pull', label: 'Pull' },
-    { id: 'legs', label: 'Legs' },
-    { id: 'cardio', label: 'Cardio' },
-    { id: 'core', label: 'Core' }
-  ];
+  useEffect(() => {
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      const data = await exerciseDB.search(query, filter);
+      setResults(data);
+      setSearching(false);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [query, filter]);
 
-  const filteredExercises = exercises.filter(ex => {
-    const matchesSearch = ex.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesFilter = selectedFilter === 'all' || ex.category === selectedFilter;
-    return matchesSearch && matchesFilter;
-  });
+  const renderExercise = ({ item }: { item: Exercise }) => {
+    const color = CATEGORY_COLORS[item.category] || '#4A9EFF';
+    const levelColor = LEVEL_COLORS[item.level] || '#4A9EFF';
+    const imageUrl = exerciseDB.getImageUrl(item, 0);
 
-  const handleExerciseTap = (exercise: any) => {
-    console.log('Exercise tapped:', exercise.name);
-    
-    // Navigate to ExerciseDetail with exercise data
-    navigation.navigate('ExerciseDetail', {
-      exercise: {
-        name: exercise.name,
-        category: exercise.category,
-        rating: exercise.rating,
-        sets: 4,
-        reps: '8-12',
-        weight: '60kg'
-      }
-    });
-  };
-
-  const renderStars = (rating: number) => {
-    const fullStars = Math.floor(rating);
-    const hasHalfStar = rating % 1 !== 0;
-    
     return (
-      <View style={styles.stars}>
-        {[...Array(fullStars)].map((_, i) => (
-          <Text key={i} style={styles.starIcon}>⭐</Text>
-        ))}
-        {hasHalfStar && <Text style={styles.starIcon}>⭐</Text>}
-      </View>
+      <TouchableOpacity
+        style={[styles.card, { borderTopColor: color }]}
+        onPress={() => navigation.navigate('ExerciseDetail', { exercise: item })}
+        activeOpacity={0.7}
+      >
+        {imageUrl ? (
+          <Image source={{ uri: imageUrl }} style={styles.cardImage} resizeMode="cover" />
+        ) : (
+          <View style={[styles.cardImagePlaceholder, { backgroundColor: color + '22' }]}>
+            <Text style={styles.cardImageEmoji}>💪</Text>
+          </View>
+        )}
+        <View style={styles.cardInfo}>
+          <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
+          <View style={styles.cardMeta}>
+            <Text style={[styles.cardCategory, { color }]}>{item.category}</Text>
+            <Text style={styles.cardDot}>·</Text>
+            <Text style={[styles.cardLevel, { color: levelColor }]}>{item.level}</Text>
+          </View>
+          <Text style={styles.cardMuscles} numberOfLines={1}>
+            {item.primaryMuscles.join(', ')}
+          </Text>
+        </View>
+        <Text style={[styles.cardArrow, { color }]}>›</Text>
+      </TouchableOpacity>
     );
   };
 
-  const renderExercise = ({ item }: { item: any }) => (
-    <TouchableOpacity 
-      style={styles.exerciseCard}
-      onPress={() => handleExerciseTap(item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.exerciseInfo}>
-        <Text style={styles.exerciseName}>{item.name}</Text>
-        <Text style={styles.exerciseCategory}>{item.category.toUpperCase()}</Text>
-        <View style={styles.ratingRow}>
-          {renderStars(item.rating)}
-          <Text style={styles.ratingText}>{item.rating}</Text>
-          <Text style={styles.reviewCount}>({item.reviews})</Text>
-        </View>
-      </View>
-      <TouchableOpacity 
-        style={styles.playButton}
-        onPress={() => handleExerciseTap(item)}
-      >
-        <Text style={styles.playIcon}>▶️</Text>
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-
   return (
     <View style={styles.container}>
-      {/* Header with Close Button */}
       <View style={styles.header}>
-        <Text style={styles.title}>Exercise Search</Text>
-        <TouchableOpacity 
-          style={styles.closeButton}
-          onPress={() => navigation.navigate('DashboardTab')}
-        >
-          <Text style={styles.closeIcon}>✕</Text>
+        <Text style={styles.title}>EXERCISES</Text>
+        <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.navigate('DashboardTab')}>
+          <Text style={styles.closeBtnText}>✕</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
+      <View style={styles.searchBar}>
+        <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search exercises..."
-          placeholderTextColor={colors.text.secondary}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
+          placeholder="Search by name or muscle..."
+          placeholderTextColor="#2a4a7f"
+          value={query}
+          onChangeText={setQuery}
+          autoCorrect={false}
         />
-        <TouchableOpacity style={styles.searchButton}>
-          <Text style={styles.searchIcon}>🔍</Text>
-        </TouchableOpacity>
+        {(query.length > 0 || searching) && (
+          <TouchableOpacity onPress={() => setQuery('')}>
+            {searching
+              ? <ActivityIndicator size="small" color="#4A9EFF" />
+              : <Text style={styles.clearBtn}>✕</Text>
+            }
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Filters */}
-      <View style={styles.filtersContainer}>
-        <FlatList
-          horizontal
-          data={filters}
-          showsHorizontalScrollIndicator={false}
-          renderItem={({ item }) => (
+      <View style={styles.filterBar}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
+          {FILTERS.map(item => (
             <TouchableOpacity
-              style={[
-                styles.filterChip,
-                selectedFilter === item.id && styles.filterChipActive
-              ]}
-              onPress={() => setSelectedFilter(item.id)}
+              key={item.id}
+              style={[styles.filterPill, filter === item.id && styles.filterPillActive]}
+              onPress={() => setFilter(item.id)}
             >
-              <Text style={[
-                styles.filterText,
-                selectedFilter === item.id && styles.filterTextActive
-              ]}>
+              <Text style={filter === item.id ? styles.filterTextActive : styles.filterText}>
                 {item.label}
               </Text>
             </TouchableOpacity>
-          )}
-          keyExtractor={item => item.id}
-        />
+          ))}
+        </ScrollView>
       </View>
 
-      {/* Results */}
-      <FlatList
-        data={filteredExercises}
-        renderItem={renderExercise}
-        keyExtractor={item => item.id}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🔍</Text>
-            <Text style={styles.emptyText}>No exercises found</Text>
-            <Text style={styles.emptySubtext}>Try a different search or filter</Text>
-          </View>
-        }
-      />
+      <Text style={styles.resultsCount}>
+        {loading ? 'Loading exercises...' : `${results.length} EXERCISES`}
+      </Text>
+
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#4A9EFF" />
+          <Text style={styles.loadingText}>Loading 800+ exercises...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={results}
+          renderItem={renderExercise}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyEmoji}>🔍</Text>
+              <Text style={styles.emptyTitle}>No exercises found</Text>
+              <Text style={styles.emptyText}>Try a different search or filter</Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.primary.dark  // Changed from lightGray
-  },
+  container: { flex: 1, backgroundColor: '#0a1628' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60 },
+  loadingText: { color: '#5a7fa8', marginTop: 12, fontSize: 14 },
+
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: 50,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.primary.dark,  // Changed from white
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)'  // Changed border color
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingTop: 56, paddingBottom: 16, paddingHorizontal: 20,
+    backgroundColor: '#0d1f3c', borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text.white,  // Changed from primary
-    flex: 1
+  title: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 2 },
+  closeBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#1a3a6b', alignItems: 'center', justifyContent: 'center' },
+  closeBtnText: { color: '#8ab4f8', fontSize: 16, fontWeight: '700' },
+
+  searchBar: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#0d1f3c', paddingHorizontal: 16, paddingVertical: 10,
+    borderBottomWidth: 1, borderBottomColor: '#1a3a6b', gap: 10,
   },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.accent.blue + '90',  // Changed
-    alignItems: 'center',
-    justifyContent: 'center'
+  searchIcon: { fontSize: 18 },
+  searchInput: { flex: 1, color: '#fff', fontSize: 16, paddingVertical: 6 },
+  clearBtn: { color: '#5a7fa8', fontSize: 16, fontWeight: '700', padding: 4 },
+
+  filterBar: { backgroundColor: '#0d1f3c', borderBottomWidth: 1, borderBottomColor: '#1a3a6b' },
+  filterContent: { flexDirection: 'row', paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
+  filterPill: { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: '#1a3a6b' },
+  filterPillActive: { backgroundColor: '#4A9EFF' },
+  filterText: { color: '#5a7fa8', fontSize: 13, fontWeight: '700' },
+  filterTextActive: { color: '#ffffff', fontSize: 13, fontWeight: '700' },
+
+  resultsCount: { color: '#2a4a7f', fontSize: 11, fontWeight: '700', letterSpacing: 2, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 4 },
+  listContent: { padding: 16, paddingBottom: 100 },
+
+  card: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#0d1f3c', borderRadius: 16,
+    marginBottom: 12, borderTopWidth: 3, elevation: 4,
+    overflow: 'hidden',
   },
-  closeIcon: {
-    fontSize: 20,
-    color: colors.text.white,  // Changed
-    fontWeight: 'bold'
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    padding: spacing.lg,
-    backgroundColor: colors.primary.dark,  // Changed from white
-    gap: spacing.sm
-  },
-  searchInput: {
-    flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.1)',  // Changed
-    borderRadius: borderRadius.small,
-    padding: spacing.md,
-    fontSize: 16,
-    color: colors.text.white  // Changed
-  },
-  searchButton: {
-    width: 50,
-    height: 50,
-    backgroundColor: colors.accent.blue,
-    borderRadius: borderRadius.small,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  searchIcon: {
-    fontSize: 20
-  },
-  filtersContainer: {
-    backgroundColor: colors.primary.dark,  // Changed from white
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md
-  },
-  filterChip: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.large,
-    backgroundColor: 'rgba(255,255,255,0.1)',  // Changed
-    marginRight: spacing.sm
-  },
-  filterChipActive: {
-    backgroundColor: colors.accent.blue
-  },
-  filterText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.white  // Changed
-  },
-  filterTextActive: {
-    color: colors.text.white
-  },
-  listContent: {
-    padding: spacing.lg,
-    paddingBottom: 100
-  },
-  // Exercise cards stay white for contrast
-  exerciseCard: {
-    flexDirection: 'row',
-    backgroundColor: colors.background.white,
-    borderRadius: borderRadius.medium,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
-  },
-  exerciseInfo: {
-    flex: 1
-  },
-  exerciseName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 4
-  },
-  exerciseCategory: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.accent.blue,
-    marginBottom: spacing.sm
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  stars: {
-    flexDirection: 'row'
-  },
-  starIcon: {
-    fontSize: 12
-  },
-  ratingText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginLeft: spacing.xs
-  },
-  reviewCount: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginLeft: spacing.xs
-  },
-  playButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: colors.accent.blue + '20',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  playIcon: {
-    fontSize: 20
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingTop: spacing.xl * 3
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: spacing.md
-  },
-  emptyText: {
-    textAlign: 'center',
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.xs
-  },
-  emptySubtext: {
-    textAlign: 'center',
-    fontSize: 14,
-    color: colors.text.secondary
-  }
+  cardImage: { width: 80, height: 80 },
+  cardImagePlaceholder: { width: 80, height: 80, alignItems: 'center', justifyContent: 'center' },
+  cardImageEmoji: { fontSize: 32 },
+  cardInfo: { flex: 1, padding: 12 },
+  cardName: { color: '#fff', fontSize: 15, fontWeight: '800', marginBottom: 4 },
+  cardMeta: { flexDirection: 'row', alignItems: 'center', marginBottom: 4, gap: 6 },
+  cardCategory: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+  cardDot: { color: '#2a4a7f', fontSize: 14 },
+  cardLevel: { fontSize: 11, fontWeight: '700', textTransform: 'capitalize' },
+  cardMuscles: { color: '#5a7fa8', fontSize: 12, textTransform: 'capitalize' },
+  cardArrow: { fontSize: 28, fontWeight: '300', paddingRight: 14 },
+
+  emptyState: { alignItems: 'center', paddingTop: 80 },
+  emptyEmoji: { fontSize: 56, marginBottom: 16 },
+  emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '800', marginBottom: 8 },
+  emptyText: { color: '#5a7fa8', fontSize: 14 },
 });

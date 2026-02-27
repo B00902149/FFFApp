@@ -33,12 +33,11 @@ const postSchema = new mongoose.Schema({
   },
   category: {
     type: String,
-    enum: ['Prayer Request', 'Testimony', 'Encouragement', 'Victory'],
+    enum: ['Help Request', 'Testimony', 'Encouragement', 'Victory'],
     required: true
   },
   content: {
     type: String,
-    required: true,
     maxlength: 1000
   },
   likes: [{
@@ -52,12 +51,10 @@ const postSchema = new mongoose.Schema({
   }
 });
 
-// Add method to get like count
 postSchema.methods.getLikeCount = function() {
   return this.likes.length;
 };
 
-// Add method to check if user liked
 postSchema.methods.isLikedBy = function(userId) {
   return this.likes.some(id => id.toString() === userId.toString());
 };

@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Alert, ActivityIndicator } from 'react-native';
-import { colors, spacing, borderRadius } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { postsAPI } from '../services/api';
 
@@ -15,23 +14,40 @@ interface Post {
   createdAt: string;
 }
 
+const CATEGORY_CONFIG: Record<string, { icon: string; color: string }> = {
+  'Help Request':  { icon: '🆘', color: '#7B6FFF' },
+  'Testimony':     { icon: '✨', color: '#FFD700' },
+  'Encouragement': { icon: '💪', color: '#26de81' },
+  'Victory':       { icon: '🎉', color: '#FF9F43' },
+  'default':       { icon: '📝', color: '#4A9EFF' },
+};
+
+const getTimeAgo = (dateString: string) => {
+  const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return new Date(dateString).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
+};
+
 export const CommunityScreen = ({ navigation }: any) => {
   const { user } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeFilter, setActiveFilter] = useState('All');
 
-  useEffect(() => {
-    loadPosts();
-  }, []);
+  const filters = ['All', 'Help Request', 'Testimony', 'Encouragement', 'Victory'];
+
+  useEffect(() => { loadPosts(); }, []);
 
   const loadPosts = async () => {
     try {
       setLoading(true);
       const data = await postsAPI.getPosts(20, 0);
       setPosts(data);
-    } catch (error) {
-      console.error('Failed to load posts:', error);
+    } catch {
       Alert.alert('Error', 'Failed to load community posts');
     } finally {
       setLoading(false);
@@ -41,76 +57,27 @@ export const CommunityScreen = ({ navigation }: any) => {
 
   const handleLike = async (postId: string) => {
     if (!user?.id) return;
-
     try {
       const updatedPost = await postsAPI.likePost(postId, user.id);
-      
-      // Update local state
-      setPosts(posts.map(p => 
-        p._id === postId ? updatedPost : p
-      ));
-    } catch (error) {
-      console.error('Failed to like post:', error);
+      setPosts(posts.map(p => p._id === postId ? updatedPost : p));
+    } catch {
+      console.error('Failed to like post');
     }
   };
 
   const handleCreatePost = () => {
     navigation.navigate('CreatePost', {
-      onPostCreated: (newPost: Post) => {
-        setPosts([newPost, ...posts]);
-      }
+      onPostCreated: (newPost: Post) => setPosts([newPost, ...posts]),
     });
   };
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'Prayer Request': return '🙏';
-      case 'Testimony': return '✨';
-      case 'Encouragement': return '💪';
-      case 'Victory': return '🎉';
-      default: return '📝';
-    }
-  };
-
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'Prayer Request': return colors.accent.blue;
-      case 'Testimony': return colors.accent.yellow;
-      case 'Encouragement': return colors.accent.green;
-      case 'Victory': return colors.accent.red;
-      default: return colors.text.secondary;
-    }
-  };
-
-  const getTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    if (seconds < 60) return 'just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-    return date.toLocaleDateString();
-  };
+  const filteredPosts = activeFilter === 'All' ? posts : posts.filter(p => p.category === activeFilter);
 
   if (loading && posts.length === 0) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backIcon}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Community</Text>
-          <View style={styles.placeholder} />
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.accent.blue} />
-          <Text style={styles.loadingText}>Loading community...</Text>
-        </View>
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#4A9EFF" />
+        <Text style={styles.loadingText}>Loading community...</Text>
       </View>
     );
   }
@@ -119,125 +86,115 @@ export const CommunityScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backIcon}>←</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Community</Text>
-        <TouchableOpacity 
-          style={styles.createButton}
-          onPress={handleCreatePost}
-        >
-          <Text style={styles.createIcon}>+</Text>
+        <Text style={styles.title}>COMMUNITY</Text>
+        <TouchableOpacity style={styles.createBtn} onPress={handleCreatePost}>
+          <Text style={styles.createBtnText}>+</Text>
         </TouchableOpacity>
       </View>
 
       {/* Faith Banner */}
-      <View style={styles.faithBanner}>
+      <View style={styles.banner}>
         <Text style={styles.bannerIcon}>💬</Text>
-        <View style={styles.bannerContent}>
+        <View style={{ flex: 1 }}>
           <Text style={styles.bannerTitle}>Share Your Journey</Text>
-          <Text style={styles.bannerText}>
-            Encourage one another and build each other up
-          </Text>
+          <Text style={styles.bannerSub}>Encourage one another and build each other up</Text>
         </View>
       </View>
 
-      {/* Posts Feed */}
-      <ScrollView 
+      {/* Category Filters */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterBar}
+        contentContainerStyle={styles.filterContent}
+      >
+        {filters.map(filter => {
+          const cfg = CATEGORY_CONFIG[filter] || CATEGORY_CONFIG['default'];
+          const isActive = activeFilter === filter;
+          return (
+            <TouchableOpacity
+              key={filter}
+              style={[styles.filterPill, isActive && { backgroundColor: filter === 'All' ? '#4A9EFF' : cfg.color }]}
+              onPress={() => setActiveFilter(filter)}
+            >
+              {filter !== 'All' && <Text style={styles.filterIcon}>{cfg.icon}</Text>}
+              <Text style={[styles.filterText, isActive && styles.filterTextActive]}>
+                {filter}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Feed */}
+      <ScrollView
         style={styles.feed}
+        contentContainerStyle={styles.feedContent}
+        showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => {
-              setRefreshing(true);
-              loadPosts();
-            }}
-            tintColor={colors.accent.blue}
-            colors={[colors.accent.blue]}
+            onRefresh={() => { setRefreshing(true); loadPosts(); }}
+            tintColor="#4A9EFF"
+            colors={['#4A9EFF']}
           />
         }
       >
-        {posts.length === 0 ? (
+        {filteredPosts.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyIcon}>🌟</Text>
-            <Text style={styles.emptyTitle}>No Posts Yet</Text>
-            <Text style={styles.emptyText}>
-              Be the first to share something with the community!
+            <Text style={styles.emptyEmoji}>🌟</Text>
+            <Text style={styles.emptyTitle}>
+              {activeFilter === 'All' ? 'No Posts Yet' : `No ${activeFilter} posts yet`}
             </Text>
-            <TouchableOpacity 
-              style={styles.emptyButton}
-              onPress={handleCreatePost}
-            >
-              <Text style={styles.emptyButtonText}>Create First Post</Text>
+            <Text style={styles.emptyText}>Be the first to share with the community!</Text>
+            <TouchableOpacity style={styles.emptyBtn} onPress={handleCreatePost}>
+              <Text style={styles.emptyBtnText}>+ Create Post</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          posts.map((post) => {
+          filteredPosts.map(post => {
+            const cfg = CATEGORY_CONFIG[post.category] || CATEGORY_CONFIG['default'];
             const isLiked = user?.id ? post.likes.includes(user.id) : false;
-            
+            const initials = post.username.charAt(0).toUpperCase();
+
             return (
-              <View key={post._id} style={styles.postCard}>
+              <View key={post._id} style={[styles.postCard, { borderTopColor: cfg.color }]}>
                 {/* Post Header */}
                 <View style={styles.postHeader}>
-                  <View style={styles.avatarContainer}>
-                    <Text style={styles.avatar}>
-                      {post.username.charAt(0).toUpperCase()}
-                    </Text>
+                  <View style={[styles.avatar, { backgroundColor: cfg.color + '30' }]}>
+                    <Text style={[styles.avatarText, { color: cfg.color }]}>{initials}</Text>
                   </View>
                   <View style={styles.postMeta}>
                     <Text style={styles.username}>{post.username}</Text>
                     <Text style={styles.timestamp}>{getTimeAgo(post.createdAt)}</Text>
                   </View>
-                  <View 
-                    style={[
-                      styles.categoryBadge,
-                      { backgroundColor: getCategoryColor(post.category) + '20' }
-                    ]}
-                  >
-                    <Text style={styles.categoryIcon}>{getCategoryIcon(post.category)}</Text>
+                  <View style={[styles.categoryPill, { backgroundColor: cfg.color + '20' }]}>
+                    <Text style={styles.categoryPillIcon}>{cfg.icon}</Text>
+                    <Text style={[styles.categoryPillText, { color: cfg.color }]}>{post.category}</Text>
                   </View>
                 </View>
 
-                {/* Category Label */}
-                <View style={styles.categoryLabelContainer}>
-                  <Text 
-                    style={[
-                      styles.categoryLabel,
-                      { color: getCategoryColor(post.category) }
-                    ]}
-                  >
-                    {post.category}
-                  </Text>
-                </View>
-
-                {/* Post Content */}
+                {/* Content */}
                 <Text style={styles.postContent}>{post.content}</Text>
 
-                {/* Post Actions */}
+                {/* Actions */}
                 <View style={styles.postActions}>
-                  <TouchableOpacity 
-                    style={styles.actionButton}
-                    onPress={() => handleLike(post._id)}
-                  >
+                  <TouchableOpacity style={styles.actionBtn} onPress={() => handleLike(post._id)}>
                     <Text style={styles.actionIcon}>{isLiked ? '❤️' : '🤍'}</Text>
-                    <Text style={styles.actionText}>
+                    <Text style={[styles.actionText, isLiked && { color: '#FF6B6B' }]}>
                       {post.likes.length} {post.likes.length === 1 ? 'Like' : 'Likes'}
                     </Text>
                   </TouchableOpacity>
 
-                  <TouchableOpacity 
-                    style={styles.actionButton}
-                    onPress={() => {
-                      navigation.navigate('PostDetail', { 
-                        post,
-                        onUpdate: (updatedPost: Post) => {
-                          setPosts(posts.map(p => p._id === updatedPost._id ? updatedPost : p));
-                        }
-                      });
-                    }}
+                  <TouchableOpacity
+                    style={styles.actionBtn}
+                    onPress={() => navigation.navigate('PostDetail', {
+                      post,
+                      onUpdate: (updated: Post) => setPosts(posts.map(p => p._id === updated._id ? updated : p)),
+                    })}
                   >
                     <Text style={styles.actionIcon}>💬</Text>
                     <Text style={styles.actionText}>
@@ -249,219 +206,99 @@ export const CommunityScreen = ({ navigation }: any) => {
             );
           })
         )}
-
-        {/* Bottom Padding */}
-        <View style={styles.bottomSpacer} />
+        <View style={{ height: 100 }} />
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#001F3F'
-  },
+  container: { flex: 1, backgroundColor: '#0a1628' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a1628' },
+  loadingText: { color: '#8ab4f8', marginTop: 12 },
+
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingTop: 50,
-    paddingBottom: spacing.md,
-    backgroundColor: '#001F3F',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)'
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingTop: 56, paddingBottom: 16, paddingHorizontal: 20,
+    backgroundColor: '#0d1f3c', borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.accent.blue,
-    alignItems: 'center',
-    justifyContent: 'center'
+  backBtn: { width: 60 },
+  backText: { color: '#4A9EFF', fontSize: 16, fontWeight: '600' },
+  title: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 2 },
+  createBtn: {
+    width: 36, height: 36, borderRadius: 18,
+    backgroundColor: '#4A9EFF', alignItems: 'center', justifyContent: 'center',
   },
-  backIcon: {
-    fontSize: 24,
-    color: colors.text.white,
-    fontWeight: 'bold'
+  createBtnText: { color: '#fff', fontSize: 26, fontWeight: '800', lineHeight: 32 },
+
+  banner: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#0d1f3c', padding: 16,
+    borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
+    borderLeftWidth: 3, borderLeftColor: '#4A9EFF',
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text.white,
-    flex: 1,
-    textAlign: 'center'
+  bannerIcon: { fontSize: 28, marginRight: 14 },
+  bannerTitle: { color: '#fff', fontSize: 14, fontWeight: '800', marginBottom: 2 },
+  bannerSub: { color: '#5a7fa8', fontSize: 12 },
+
+  filterBar: {
+    backgroundColor: '#0d1f3c',
+    borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
+    maxHeight: 52,
   },
-  createButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.accent.blue,
-    alignItems: 'center',
-    justifyContent: 'center'
+  filterContent: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  filterPill: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 14, paddingVertical: 6,
+    borderRadius: 20, backgroundColor: '#1a3a6b',
+    gap: 4,
   },
-  createIcon: {
-    fontSize: 28,
-    color: colors.text.white,
-    fontWeight: 'bold',
-    marginTop: -2
+  filterIcon: { fontSize: 13 },
+  filterText: { color: '#5a7fa8', fontSize: 12, fontWeight: '700' },
+  filterTextActive: { color: '#fff' },
+
+  feed: { flex: 1 },
+  feedContent: { padding: 16 },
+
+  emptyState: { alignItems: 'center', paddingVertical: 60 },
+  emptyEmoji: { fontSize: 64, marginBottom: 16 },
+  emptyTitle: { color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 8 },
+  emptyText: { color: '#5a7fa8', fontSize: 14, textAlign: 'center', marginBottom: 24 },
+  emptyBtn: {
+    backgroundColor: '#4A9EFF', borderRadius: 12,
+    paddingHorizontal: 24, paddingVertical: 12,
   },
-  placeholder: {
-    width: 40
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  loadingText: {
-    marginTop: spacing.md,
-    fontSize: 16,
-    color: colors.text.secondary
-  },
-  faithBanner: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    padding: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)'
-  },
-  bannerIcon: {
-    fontSize: 32,
-    marginRight: spacing.md
-  },
-  bannerContent: {
-    flex: 1
-  },
-  bannerTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.white,
-    marginBottom: 2
-  },
-  bannerText: {
-    fontSize: 13,
-    color: 'rgba(255,255,255,0.8)'  
-  },
-  feed: {
-    flex: 1
-  },
-  emptyState: {
-    alignItems: 'center',
-    padding: spacing.xl * 2,
-    marginTop: spacing.xl * 2
-  },
-  emptyIcon: {
-    fontSize: 80,
-    marginBottom: spacing.md
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: spacing.sm
-  },
-  emptyText: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginBottom: spacing.lg
-  },
-  emptyButton: {
-    backgroundColor: colors.accent.blue,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.medium
-  },
-  emptyButtonText: {
-    color: colors.text.white,
-    fontSize: 16,
-    fontWeight: '600'
-  },
+  emptyBtnText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+
   postCard: {
-    backgroundColor: colors.background.white,
-    marginBottom: spacing.sm,
-    padding: spacing.lg
+    backgroundColor: '#0d1f3c', borderRadius: 16,
+    padding: 16, marginBottom: 14,
+    borderTopWidth: 3, elevation: 4,
   },
-  postHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm
-  },
-  avatarContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.accent.blue + '30',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md
-  },
+  postHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 12 },
   avatar: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.accent.blue
+    width: 40, height: 40, borderRadius: 20,
+    alignItems: 'center', justifyContent: 'center', marginRight: 12,
   },
-  postMeta: {
-    flex: 1
+  avatarText: { fontSize: 18, fontWeight: '800' },
+  postMeta: { flex: 1 },
+  username: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  timestamp: { color: '#5a7fa8', fontSize: 12, marginTop: 2 },
+  categoryPill: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 8, paddingVertical: 4,
+    borderRadius: 12, gap: 4,
   },
-  username: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text.primary
-  },
-  timestamp: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginTop: 2
-  },
-  categoryBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  categoryIcon: {
-    fontSize: 18
-  },
-  categoryLabelContainer: {
-    marginBottom: spacing.sm
-  },
-  categoryLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
-  },
-  postContent: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.text.primary,
-    marginBottom: spacing.md
-  },
+  categoryPillIcon: { fontSize: 12 },
+  categoryPillText: { fontSize: 10, fontWeight: '800', letterSpacing: 0.5 },
+
+  postContent: { color: '#c8d8f0', fontSize: 15, lineHeight: 24, marginBottom: 14 },
+
   postActions: {
-    flexDirection: 'row',
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.background.lightGray,
-    gap: spacing.lg
+    flexDirection: 'row', gap: 20,
+    paddingTop: 12, borderTopWidth: 1, borderTopColor: '#1a3a6b',
   },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  actionIcon: {
-    fontSize: 18,
-    marginRight: spacing.xs
-  },
-  actionText: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    fontWeight: '500'
-  },
-  bottomSpacer: {
-    height: 100
-  }
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  actionIcon: { fontSize: 16 },
+  actionText: { color: '#5a7fa8', fontSize: 13, fontWeight: '600' },
 });

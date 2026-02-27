@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions } from 'react-native';
-import { colors, spacing, borderRadius } from '../theme/colors';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { nutritionAPI } from '../services/api';
-
-const screenWidth = Dimensions.get('window').width;
+import { useDailyQuote } from '../hooks/useDailyQuote';
 
 interface DayData {
   date: string;
@@ -17,85 +15,52 @@ interface DayData {
 
 export const WeeklyNutritionScreen = ({ navigation }: any) => {
   const { user } = useAuth();
+  const quote = useDailyQuote();
   const [loading, setLoading] = useState(true);
   const [weekData, setWeekData] = useState<DayData[]>([]);
-  const [weekTotal, setWeekTotal] = useState({
-    calories: 0,
-    protein: 0,
-    carbs: 0,
-    fat: 0
-  });
+  const [weekTotal, setWeekTotal] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+  const [expandedDay, setExpandedDay] = useState<number | null>(null);
 
-  useEffect(() => {
-    loadWeeklyData();
-  }, []);
+  useEffect(() => { loadWeeklyData(); }, []);
 
   const loadWeeklyData = async () => {
     try {
       setLoading(true);
-      
       if (!user?.id) return;
 
-      // Get last 7 days
       const days: DayData[] = [];
       const today = new Date();
-      
+
       for (let i = 6; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
         const dateStr = date.toISOString().split('T')[0];
-        const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+        const dayName = date.toLocaleDateString('en-GB', { weekday: 'short' });
 
         try {
           const nutrition = await nutritionAPI.getNutrition(user.id, dateStr);
-          
-          // Calculate macros from all meals
-          let totalProtein = 0;
-          let totalCarbs = 0;
-          let totalFat = 0;
-
+          let totalProtein = 0, totalCarbs = 0, totalFat = 0;
           ['breakfast', 'lunch', 'dinner', 'snacks'].forEach(meal => {
-            const mealItems = nutrition[meal] || [];
-            mealItems.forEach((item: any) => {
+            (nutrition[meal] || []).forEach((item: any) => {
               totalProtein += item.protein || 0;
               totalCarbs += item.carbs || 0;
               totalFat += item.fat || 0;
             });
           });
-
-          days.push({
-            date: dateStr,
-            dayName,
-            calories: nutrition.totalCalories || 0,
-            protein: Math.round(totalProtein),
-            carbs: Math.round(totalCarbs),
-            fat: Math.round(totalFat)
-          });
-        } catch (error) {
-          // Day has no data
-          days.push({
-            date: dateStr,
-            dayName,
-            calories: 0,
-            protein: 0,
-            carbs: 0,
-            fat: 0
-          });
+          days.push({ date: dateStr, dayName, calories: nutrition.totalCalories || 0, protein: Math.round(totalProtein), carbs: Math.round(totalCarbs), fat: Math.round(totalFat) });
+        } catch {
+          days.push({ date: dateStr, dayName, calories: 0, protein: 0, carbs: 0, fat: 0 });
         }
       }
 
-      setWeekData(days);
-
-      // Calculate totals
+      setWeekData(days.reverse());
       const totals = days.reduce((acc, day) => ({
         calories: acc.calories + day.calories,
         protein: acc.protein + day.protein,
         carbs: acc.carbs + day.carbs,
-        fat: acc.fat + day.fat
+        fat: acc.fat + day.fat,
       }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
-
       setWeekTotal(totals);
-
     } catch (error) {
       console.error('Load weekly data error:', error);
     } finally {
@@ -103,506 +68,281 @@ export const WeeklyNutritionScreen = ({ navigation }: any) => {
     }
   };
 
-  const renderCalorieChart = () => {
-    if (weekData.length === 0) return null;
-
-    const maxCalories = Math.max(...weekData.map(d => d.calories), 1);
-    const chartHeight = 150;
-
-    return (
-      <View style={styles.chartContainer}>
-        <Text style={styles.chartTitle}>Daily Calories</Text>
-        
-        <View style={styles.barsContainer}>
-          {weekData.map((day, index) => {
-            const barHeight = (day.calories / maxCalories) * chartHeight;
-            const isToday = index === weekData.length - 1;
-
-            return (
-              <View key={index} style={styles.barWrapper}>
-                <View style={styles.barColumn}>
-                  <View style={{ flex: 1, justifyContent: 'flex-end' }}>
-                    {day.calories > 0 && (
-                      <View 
-                        style={[
-                          styles.bar,
-                          { 
-                            height: barHeight,
-                            backgroundColor: isToday ? colors.accent.blue : colors.accent.green
-                          }
-                        ]}
-                      >
-                        <Text style={styles.barValue}>{day.calories}</Text>
-                      </View>
-                    )}
-                  </View>
-                </View>
-                <Text style={[styles.barLabel, isToday && styles.barLabelToday]}>
-                  {day.dayName}
-                </Text>
-              </View>
-            );
-          })}
-        </View>
-      </View>
-    );
-  };
-
-  const renderMacroBreakdown = () => {
-    const total = weekTotal.protein + weekTotal.carbs + weekTotal.fat;
-    if (total === 0) return null;
-
-    const proteinPercent = (weekTotal.protein * 4 / (weekTotal.calories || 1)) * 100;
-    const carbsPercent = (weekTotal.carbs * 4 / (weekTotal.calories || 1)) * 100;
-    const fatPercent = (weekTotal.fat * 9 / (weekTotal.calories || 1)) * 100;
-
-    return (
-      <View style={styles.macroContainer}>
-        <Text style={styles.sectionTitle}>Weekly Macros Breakdown</Text>
-
-        {/* Progress bars */}
-        <View style={styles.macroRow}>
-          <Text style={styles.macroLabel}>Protein</Text>
-          <View style={styles.macroBarContainer}>
-            <View 
-              style={[
-                styles.macroBar, 
-                { 
-                  width: `${Math.min(proteinPercent, 100)}%`,
-                  backgroundColor: colors.accent.blue 
-                }
-              ]} 
-            />
-          </View>
-          <Text style={styles.macroValue}>{weekTotal.protein}g</Text>
-        </View>
-
-        <View style={styles.macroRow}>
-          <Text style={styles.macroLabel}>Carbs</Text>
-          <View style={styles.macroBarContainer}>
-            <View 
-              style={[
-                styles.macroBar, 
-                { 
-                  width: `${Math.min(carbsPercent, 100)}%`,
-                  backgroundColor: colors.accent.green 
-                }
-              ]} 
-            />
-          </View>
-          <Text style={styles.macroValue}>{weekTotal.carbs}g</Text>
-        </View>
-
-        <View style={styles.macroRow}>
-          <Text style={styles.macroLabel}>Fat</Text>
-          <View style={styles.macroBarContainer}>
-            <View 
-              style={[
-                styles.macroBar, 
-                { 
-                  width: `${Math.min(fatPercent, 100)}%`,
-                  backgroundColor: colors.accent.red 
-                }
-              ]} 
-            />
-          </View>
-          <Text style={styles.macroValue}>{weekTotal.fat}g</Text>
-        </View>
-      </View>
-    );
-  };
-
   if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backIcon}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Weekly Nutrition</Text>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.text.white} />
-          <Text style={styles.loadingText}>Loading weekly data...</Text>
-        </View>
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#4A9EFF" />
+        <Text style={styles.loadingText}>Loading weekly data...</Text>
       </View>
     );
   }
 
-  const avgCalories = weekTotal.calories / 7;
+  const today = weekData[0];
+  const avgCalories = Math.round(weekTotal.calories / 7);
+  const totalKcalBurned = weekTotal.calories; // same as consumed for display
+  const maxCalories = Math.max(...weekData.map(d => d.calories), 1);
+
+  const macros = [
+    { label: 'Protein', value: weekTotal.protein, color: '#4A9EFF', pct: Math.round((weekTotal.protein * 4 / (weekTotal.calories || 1)) * 100) },
+    { label: 'Carbs',   value: weekTotal.carbs,   color: '#4A9EFF', pct: Math.round((weekTotal.carbs * 4   / (weekTotal.calories || 1)) * 100) },
+    { label: 'Fat',     value: weekTotal.fat,      color: '#4A9EFF', pct: Math.round((weekTotal.fat * 9    / (weekTotal.calories || 1)) * 100) },
+  ];
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backIcon}>←</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Weekly Nutrition</Text>
+        <Text style={styles.title}>WEEKLY NUTRITION</Text>
+        <View style={{ width: 60 }} />
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* Summary Cards */}
-        <View style={styles.summaryGrid}>
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryIcon}>🔥</Text>
-            <Text style={styles.summaryValue}>{weekTotal.calories.toLocaleString()}</Text>
-            <Text style={styles.summaryLabel}>Total Calories</Text>
-          </View>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-          <View style={styles.summaryCard}>
-            <Text style={styles.summaryIcon}>📊</Text>
-            <Text style={styles.summaryValue}>{Math.round(avgCalories)}</Text>
-            <Text style={styles.summaryLabel}>Daily Average</Text>
+        {/* 1. Weekly Macros */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>WEEKLY MACROS</Text>
+          <View style={styles.macroTotals}>
+            {macros.map(m => (
+              <View key={m.label} style={styles.macroTile}>
+                <Text style={styles.macroTileValue}>{m.value}g</Text>
+                <Text style={styles.macroTileLabel}>{m.label}</Text>
+                <Text style={styles.macroTilePct}>{m.pct}%</Text>
+              </View>
+            ))}
           </View>
+          {macros.map(m => (
+            <View key={m.label} style={styles.macroBarRow}>
+              <Text style={styles.macroBarLabel}>{m.label}</Text>
+              <View style={styles.macroBarTrack}>
+                <View style={[styles.macroBarFill, { width: `${Math.min(m.pct, 100)}%`, backgroundColor: m.color }]} />
+              </View>
+              <Text style={styles.macroBarValue}>{m.value}g</Text>
+            </View>
+          ))}
         </View>
 
-        {/* Calorie Chart */}
-        {renderCalorieChart()}
+        {/* 2. Today's Breakdown */}
+        {today && (
+          <View style={[styles.card, { borderTopColor: '#4A9EFF'}]}>
+            <Text style={styles.cardTitle}>TODAY'S BREAKDOWN</Text>
+            <View style={styles.todayGrid}>
+              {[
+                { label: 'Calories', value: `${today.calories}`, color: '#4A9EFF' },
+                { label: 'Protein',  value: `${today.protein}g`, color: '#4A9EFF' },
+                { label: 'Carbs',    value: `${today.carbs}g`,   color: '#4A9EFF' },
+                { label: 'Fat',      value: `${today.fat}g`,     color: '#4A9EFF' },
+              ].map(item => (
+                <View key={item.label} style={styles.todayTile}>
+                  <Text style={[styles.todayValue, { color: item.color }]}>{item.value}</Text>
+                  <Text style={styles.todayLabel}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
 
-        {/* Macro Breakdown */}
-        {renderMacroBreakdown()}
+        {/* 3. Daily Breakdown — Today shown, rest collapsible */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>DAILY BREAKDOWN</Text>
+          {weekData.map((day, i) => {
+            const isToday = i === 0;
+            const isExpanded = expandedDay === i;
+            const dateLabel = new Date(day.date).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
 
-        {/* Daily Breakdown */}
-        <View style={styles.dailyContainer}>
-          <Text style={styles.sectionTitle}>Daily Breakdown</Text>
-          
-          {weekData.map((day, index) => {
-            const isToday = index === weekData.length - 1;
+            if (isToday) {
+              // Always show today fully
+              return (
+                <View key={i} style={[styles.dayRow, styles.dayRowToday]}>
+                  <View style={styles.dayLeft}>
+                    <Text style={styles.dayNameToday}>{day.dayName} · Today</Text>
+                    <Text style={styles.dayDate}>{dateLabel}</Text>
+                  </View>
+                  <View style={styles.dayStats}>
+                    <Text style={styles.dayStat}>{day.calories} cal</Text>
+                    <Text style={styles.dayMacro}>P {day.protein}g</Text>
+                    <Text style={styles.dayMacro}>C {day.carbs}g</Text>
+                    <Text style={styles.dayMacro}>F {day.fat}g</Text>
+                  </View>
+                </View>
+              );
+            }
+
+            // Other days — tap arrow to expand
             return (
-              <View key={index} style={[styles.dayCard, isToday && styles.dayCardToday]}>
-                <View style={styles.dayHeader}>
-                  <Text style={[styles.dayName, isToday && styles.dayNameToday]}>
-                    {day.dayName}
-                    {isToday && ' (Today)'}
-                  </Text>
-                  <Text style={styles.dayDate}>
-                    {new Date(day.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </Text>
-                </View>
-                
-                <View style={styles.dayStats}>
-                  <View style={styles.dayStat}>
-                    <Text style={styles.dayStatValue}>{day.calories}</Text>
-                    <Text style={styles.dayStatLabel}>cal</Text>
+              <View key={i}>
+                <TouchableOpacity
+                  style={styles.dayRow}
+                  onPress={() => setExpandedDay(isExpanded ? null : i)}
+                >
+                  <View style={styles.dayLeft}>
+                    <Text style={styles.dayName}>{day.dayName}</Text>
+                    <Text style={styles.dayDate}>{dateLabel}</Text>
                   </View>
-                  <View style={styles.dayStatDivider} />
-                  <View style={styles.dayStat}>
-                    <Text style={styles.dayStatValue}>{day.protein}g</Text>
-                    <Text style={styles.dayStatLabel}>protein</Text>
+                  <View style={styles.dayRight}>
+                    <Text style={styles.dayCals}>{day.calories} cal</Text>
+                    <Text style={styles.dayArrow}>{isExpanded ? '▲' : '▼'}</Text>
                   </View>
-                  <View style={styles.dayStatDivider} />
-                  <View style={styles.dayStat}>
-                    <Text style={styles.dayStatValue}>{day.carbs}g</Text>
-                    <Text style={styles.dayStatLabel}>carbs</Text>
+                </TouchableOpacity>
+                {isExpanded && (
+                  <View style={styles.dayExpanded}>
+                    {[
+                      { label: 'Protein', value: `${day.protein}g` },
+                      { label: 'Carbs',   value: `${day.carbs}g` },
+                      { label: 'Fat',     value: `${day.fat}g` },
+                    ].map(m => (
+                      <View key={m.label} style={styles.expandedRow}>
+                        <Text style={styles.expandedLabel}>{m.label}</Text>
+                        <Text style={styles.expandedValue}>{m.value}</Text>
+                      </View>
+                    ))}
                   </View>
-                  <View style={styles.dayStatDivider} />
-                  <View style={styles.dayStat}>
-                    <Text style={styles.dayStatValue}>{day.fat}g</Text>
-                    <Text style={styles.dayStatLabel}>fat</Text>
-                  </View>
-                </View>
+                )}
               </View>
             );
           })}
         </View>
 
-        {/* Faith Card */}
-        <View style={styles.faithCard}>
-          <Text style={styles.faithIcon}>🙏</Text>
-          <View style={styles.faithContent}>
-            <Text style={styles.faithText}>
-              "So whether you eat or drink or whatever you do, do it all for the glory of God."
-            </Text>
-            <Text style={styles.faithReference}>1 Corinthians 10:31</Text>
+        {/* 4. Daily Calories Chart */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>DAILY CALORIES</Text>
+          <View style={styles.chart}>
+            {weekData.map((day, i) => {
+              const barH = Math.max((day.calories / maxCalories) * 120, day.calories > 0 ? 8 : 0);
+              const isToday = i === 0;
+              return (
+                <View key={i} style={styles.barWrap}>
+                  <Text style={styles.barVal}>{day.calories > 0 ? day.calories : ''}</Text>
+                  <View style={[styles.bar, { height: barH, backgroundColor: isToday ? '#4A9EFF' : '#1a3a6b' }]} />
+                  <Text style={[styles.barDay, isToday && { color: '#4A9EFF' }]}>{day.dayName}</Text>
+                </View>
+              );
+            })}
           </View>
         </View>
 
-        <View style={styles.bottomSpacer} />
+        {/* 5. Totals & Averages */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>TOTALS & AVERAGES</Text>
+          <View style={styles.summaryGrid}>
+            {[
+              { label: 'Total kcal\nConsumed', value: weekTotal.calories.toLocaleString(), icon: '🔥' },
+              { label: 'Daily\nAverage',        value: avgCalories.toLocaleString(),        icon: '📊' },
+              { label: 'Total\nProtein',         value: `${weekTotal.protein}g`,             icon: '💪' },
+              { label: 'Days\nLogged',           value: weekData.filter(d => d.calories > 0).length.toString(), icon: '📅' },
+            ].map(item => (
+              <View key={item.label} style={styles.summaryTile}>
+                <Text style={styles.summaryIcon}>{item.icon}</Text>
+                <Text style={styles.summaryValue}>{item.value}</Text>
+                <Text style={styles.summaryLabel}>{item.label}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+
+        {/* Faith Card */}
+        <View style={styles.faithCard}>
+          <Text style={styles.faithIcon}>🙏</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.faithText}>"{quote.text}"</Text>
+            <Text style={styles.faithRef}>— {quote.author}</Text>
+          </View>
+        </View>
+
+        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.primary.dark
-  },
+  container: { flex: 1, backgroundColor: '#0a1628' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a1628' },
+  loadingText: { color: '#8ab4f8', marginTop: 12 },
+
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: 50,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.primary.dark,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)'
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingTop: 56, paddingBottom: 16, paddingHorizontal: 20,
+    backgroundColor: '#0d1f3c', borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md
+  backBtn: { width: 60 },
+  backText: { color: '#4A9EFF', fontSize: 16, fontWeight: '600' },
+  title: { color: '#fff', fontSize: 18, fontWeight: '800', letterSpacing: 2 },
+
+  content: { padding: 16, paddingBottom: 40 },
+
+  card: {
+    backgroundColor: '#0d1f3c', borderRadius: 16,
+    padding: 18, marginBottom: 14,
+    borderTopWidth: 3, borderTopColor: '#4A9EFF', elevation: 4,
   },
-  backIcon: {
-    fontSize: 24,
-    color: colors.text.white,
-    fontWeight: 'bold'
+  cardTitle: { color: '#FFF', fontSize: 11, fontWeight: '800', letterSpacing: 2, marginBottom: 16 },
+
+  // Weekly Macros
+  macroTotals: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 16 },
+  macroTile: { flex: 1, alignItems: 'center' },
+  macroTileValue: { color: '#fff', fontSize: 20, fontWeight: '800' },
+  macroTileLabel: { color: '#5a7fa8', fontSize: 11, fontWeight: '700', marginTop: 2 },
+  macroTilePct: { color: '#4A9EFF', fontSize: 11, fontWeight: '700', marginTop: 2 },
+
+  macroBarRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
+  macroBarLabel: { color: '#5a7fa8', fontSize: 12, fontWeight: '700', width: 55 },
+  macroBarTrack: { flex: 1, height: 8, backgroundColor: '#1a3a6b', borderRadius: 4, overflow: 'hidden', marginHorizontal: 10 },
+  macroBarFill: { height: '100%', borderRadius: 4 },
+  macroBarValue: { color: '#fff', fontSize: 12, fontWeight: '700', width: 40, textAlign: 'right' },
+
+  // Today
+  todayGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  todayTile: { width: '47%', backgroundColor: '#0a1628', borderRadius: 12, padding: 14, alignItems: 'center' },
+  todayValue: { fontSize: 22, fontWeight: '800' },
+  todayLabel: { color: '#5a7fa8', fontSize: 11, fontWeight: '700', marginTop: 4, letterSpacing: 1 },
+
+  // Daily Breakdown
+  dayRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
   },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text.white
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  loadingText: {
-    marginTop: spacing.md,
-    fontSize: 16,
-    color: colors.text.white
-  },
-  content: {
-    flex: 1,
-    padding: spacing.lg
-  },
-  summaryGrid: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.lg
-  },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: colors.background.white,
-    borderRadius: borderRadius.medium,
-    padding: spacing.lg,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
-  },
-  summaryIcon: {
-    fontSize: 32,
-    marginBottom: spacing.sm
-  },
-  summaryValue: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.accent.blue,
-    marginBottom: 4
-  },
-  summaryLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    textAlign: 'center'
-  },
-  chartContainer: {
-    backgroundColor: colors.background.white,
-    borderRadius: borderRadius.medium,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
-  },
-  chartTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.lg
-  },
-  barsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    height: 180
-  },
-  barWrapper: {
-    flex: 1,
-    alignItems: 'center'
-  },
-  barColumn: {
-    flex: 1,
-    width: '80%',
-    justifyContent: 'flex-end'
-  },
-  bar: {
-    width: '100%',
-    borderTopLeftRadius: 4,
-    borderTopRightRadius: 4,
-    alignItems: 'center',
-    paddingTop: 4,
-    minHeight: 30
-  },
-  barValue: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: colors.text.white
-  },
-  barLabel: {
-    fontSize: 11,
-    color: colors.text.secondary,
-    marginTop: spacing.xs,
-    fontWeight: '600'
-  },
-  barLabelToday: {
-    color: colors.accent.blue,
-    fontWeight: 'bold'
-  },
-  macroContainer: {
-    backgroundColor: colors.background.white,
-    borderRadius: borderRadius.medium,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.lg
-  },
-  macroRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md
-  },
-  macroLabel: {
-    width: 60,
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary
-  },
-  macroBarContainer: {
-    flex: 1,
-    height: 20,
-    backgroundColor: colors.background.lightGray,
-    borderRadius: 10,
-    overflow: 'hidden',
-    marginHorizontal: spacing.sm
-  },
-  macroBar: {
-    height: '100%',
-    borderRadius: 10
-  },
-  macroValue: {
-    width: 50,
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    textAlign: 'right'
-  },
-  dailyContainer: {
-    backgroundColor: colors.background.white,
-    borderRadius: borderRadius.medium,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
-  },
-  dayCard: {
-    backgroundColor: colors.background.lightGray,
-    borderRadius: borderRadius.small,
-    padding: spacing.md,
-    marginBottom: spacing.sm
-  },
-  dayCardToday: {
-    backgroundColor: colors.accent.blue + '15',
-    borderWidth: 2,
-    borderColor: colors.accent.blue
-  },
-  dayHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm
-  },
-  dayName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary
-  },
-  dayNameToday: {
-    color: colors.accent.blue
-  },
-  dayDate: {
-    fontSize: 12,
-    color: colors.text.secondary
-  },
-  dayStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-around'
-  },
-  dayStat: {
-    alignItems: 'center'
-  },
-  dayStatValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: colors.text.primary
-  },
-  dayStatLabel: {
-    fontSize: 10,
-    color: colors.text.secondary,
-    marginTop: 2
-  },
-  dayStatDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: colors.background.lightGray
-  },
+  dayRowToday: { backgroundColor: '#0a1628', borderRadius: 12, padding: 12, marginBottom: 4 },
+  dayLeft: {},
+  dayRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  dayName: { color: '#8ab4f8', fontSize: 14, fontWeight: '700' },
+  dayNameToday: { color: '#4A9EFF', fontSize: 14, fontWeight: '800' },
+  dayDate: { color: '#2a4a7f', fontSize: 11, marginTop: 2 },
+  dayCals: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  dayArrow: { color: '#4A9EFF', fontSize: 12 },
+  dayStats: { flexDirection: 'row', gap: 8, alignItems: 'center' },
+  dayStat: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  dayMacro: { color: '#5a7fa8', fontSize: 11, fontWeight: '600' },
+
+  dayExpanded: { backgroundColor: '#0a1628', borderRadius: 10, padding: 12, marginBottom: 4 },
+  expandedRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 },
+  expandedLabel: { color: '#5a7fa8', fontSize: 13, fontWeight: '600' },
+  expandedValue: { color: '#fff', fontSize: 13, fontWeight: '700' },
+
+  // Chart
+  chart: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: 160, paddingTop: 20 },
+  barWrap: { flex: 1, alignItems: 'center', justifyContent: 'flex-end' },
+  barVal: { color: '#5a7fa8', fontSize: 9, fontWeight: '600', marginBottom: 4 },
+  bar: { width: '70%', borderRadius: 4, minHeight: 4 },
+  barDay: { color: '#5a7fa8', fontSize: 11, fontWeight: '700', marginTop: 6 },
+
+  // Totals
+  summaryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  summaryTile: { width: '47%', backgroundColor: '#0a1628', borderRadius: 12, padding: 14, alignItems: 'center' },
+  summaryIcon: { fontSize: 24, marginBottom: 6 },
+  summaryValue: { color: '#4A9EFF', fontSize: 22, fontWeight: '800', marginBottom: 4 },
+  summaryLabel: { color: '#5a7fa8', fontSize: 11, fontWeight: '700', textAlign: 'center', letterSpacing: 0.5 },
+
+  // Faith
   faithCard: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    padding: spacing.lg,
-    borderRadius: borderRadius.medium,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.accent.blue
+    flexDirection: 'row', backgroundColor: '#0d1f3c',
+    borderRadius: 16, padding: 18,
+    borderLeftWidth: 3, borderLeftColor: '#4A9EFF',
   },
-  faithIcon: {
-    fontSize: 28,
-    marginRight: spacing.md
-  },
-  faithContent: {
-    flex: 1
-  },
-  faithText: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    color: colors.text.white,
-    lineHeight: 20,
-    marginBottom: spacing.sm
-  },
-  faithReference: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.accent.blue,
-    textAlign: 'right'
-  },
-  bottomSpacer: {
-    height: 40
-  }
+  faithIcon: { fontSize: 28, marginRight: 14 },
+  faithText: { color: '#c8d8f0', fontSize: 13, fontStyle: 'italic', lineHeight: 20, marginBottom: 6 },
+  faithRef: { color: '#4A9EFF', fontSize: 12, fontWeight: '600', textAlign: 'right' },
 });

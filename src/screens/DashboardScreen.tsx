@@ -1,47 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
-import { verseAPI, nutritionAPI, profileAPI } from '../services/api';
+import { nutritionAPI, profileAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useDailyQuote } from '../hooks/useDailyQuote';
 
 export const DashboardScreen = ({ navigation }: any) => {
   const { user } = useAuth();
-  const [verse, setVerse] = useState({
-    text: "I can do all things through Christ who strengthens me.",
-    reference: "Philippians 4:13"
-  });
+  const quote = useDailyQuote();
   const [loading, setLoading] = useState(false);
   const [todaySummary, setTodaySummary] = useState({ workouts: 0, calories: 0, posts: 0 });
 
-  const motivationalQuotes = [
-    "Train your body. Discipline your mind. Fuel your purpose.",
-    "Faith makes all things possible. Love makes all things easy.",
-    "Your body is a temple. Treat it with respect and honor.",
-    "Strength doesn't come from what you can do. It comes from God's power within you.",
-    "Every workout is a prayer of gratitude for the body God gave you.",
-    "Faith over fear. Progress over perfection. Praise over pride.",
-    "Be strong and courageous. The Lord your God is with you.",
-    "Your struggle is your strength. Your faith is your fuel."
-  ];
-  const [currentQuoteIndex, setCurrentQuoteIndex] = useState(0);
-
   useEffect(() => {
-    loadDailyVerse();
     loadTodaySummary();
   }, []);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentQuoteIndex((prev) => (prev + 1) % motivationalQuotes.length);
-    }, 5000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadDailyVerse = async () => {
-    try {
-      const dailyVerse = await verseAPI.getDaily();
-      setVerse(dailyVerse);
-    } catch (error) {}
-  };
 
   const loadTodaySummary = async () => {
     try {
@@ -64,7 +35,7 @@ export const DashboardScreen = ({ navigation }: any) => {
     { id: 1, title: 'My Health',  icon: '❤️',  screen: 'Health',    color: '#FF6B6B' },
     { id: 2, title: 'Exercise',   icon: '💪',  screen: 'Exercise',  color: '#4ECDC4' },
     { id: 3, title: 'Nutrition',  icon: '🍎',  screen: 'Nutrition', color: '#FF9F43' },
-    { id: 4, title: 'Community',  icon: '👥',  screen: 'Community', color: '#7B6FFF' },
+    { id: 4, title: 'Community',  icon: '👥',  screen: 'Community', color: '#4A9EFF' },
   ];
 
   const summaryItems = [
@@ -85,9 +56,9 @@ export const DashboardScreen = ({ navigation }: any) => {
 
         {/* Daily Verse */}
         <View style={styles.verseCard}>
-          <Text style={styles.verseLabel}>✝️  DAILY VERSE</Text>
-          <Text style={styles.verseText}>"{verse.text}"</Text>
-          <Text style={styles.verseReference}>— {verse.reference}</Text>
+          <Text style={styles.verseLabel}>💬  DAILY QUOTE</Text>
+          <Text style={styles.verseText}>"{quote.text}"</Text>
+          <Text style={styles.verseReference}>— {quote.author}</Text>
         </View>
 
         {/* Today's Summary */}
@@ -147,17 +118,6 @@ export const DashboardScreen = ({ navigation }: any) => {
           <Text style={styles.progressArrow}>›</Text>
         </TouchableOpacity>
 
-        {/* Rotating Quote */}
-        <View style={styles.quoteCard}>
-          <Text style={styles.quoteIcon}>💬</Text>
-          <Text style={styles.quote}>{motivationalQuotes[currentQuoteIndex]}</Text>
-          <View style={styles.quoteDots}>
-            {motivationalQuotes.map((_, i) => (
-              <View key={i} style={[styles.quoteDot, i === currentQuoteIndex && styles.quoteDotActive]} />
-            ))}
-          </View>
-        </View>
-
       </ScrollView>
     </View>
   );
@@ -189,7 +149,7 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 14,
     borderTopWidth: 3,
-    borderTopColor: '#4A9EFF',
+    borderTopColor: '#7B6FFF',
   },
   summaryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
   summaryTitle: { color: '#fff', fontSize: 13, fontWeight: '800', letterSpacing: 1.5 },
@@ -224,7 +184,7 @@ const styles = StyleSheet.create({
     padding: 18,
     marginBottom: 14,
     borderTopWidth: 3,
-    borderTopColor: '#4A9EFF',
+    borderTopColor: '#26de81',
     elevation: 4,
   },
   progressIcon: { fontSize: 28, marginRight: 14 },
@@ -239,7 +199,7 @@ const styles = StyleSheet.create({
     padding: 24,
     alignItems: 'center',
     borderTopWidth: 3,
-    borderTopColor: '#4A9EFF',
+    borderTopColor: '#FFD700',
   },
   quoteIcon: { fontSize: 24, marginBottom: 12 },
   quote: {
@@ -253,5 +213,5 @@ const styles = StyleSheet.create({
   },
   quoteDots: { flexDirection: 'row', gap: 6 },
   quoteDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#1a3a6b' },
-  quoteDotActive: { backgroundColor: '#4A9EFF', width: 20 },
+  quoteDotActive: { backgroundColor: '#FFD700', width: 20 },
 });

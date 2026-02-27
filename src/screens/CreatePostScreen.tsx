@@ -1,58 +1,38 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
-import { colors, spacing, borderRadius } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
 import { postsAPI } from '../services/api';
+import { useDailyQuote } from '../hooks/useDailyQuote';
 
 const CATEGORIES = [
-  { name: 'Prayer Request', icon: '🙏', color: colors.accent.blue },
-  { name: 'Testimony', icon: '✨', color: colors.accent.yellow },
-  { name: 'Encouragement', icon: '💪', color: colors.accent.green },
-  { name: 'Victory', icon: '🎉', color: colors.accent.red }
+  { name: 'Help Request', icon: '🆘', color: '#7B6FFF' },
+  { name: 'Testimony',    icon: '✨', color: '#FFD700' },
+  { name: 'Encouragement',icon: '💪', color: '#26de81' },
+  { name: 'Victory',      icon: '🎉', color: '#FF9F43' },
 ];
 
 export const CreatePostScreen = ({ route, navigation }: any) => {
   const { user } = useAuth();
   const { onPostCreated } = route.params || {};
+  const quote = useDailyQuote();
 
   const [selectedCategory, setSelectedCategory] = useState('');
   const [content, setContent] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const canPost = !loading && !!selectedCategory && !!content.trim();
+
   const handleSubmit = async () => {
-    if (!selectedCategory) {
-      Alert.alert('Select Category', 'Please choose a category for your post');
-      return;
-    }
-
-    if (!content.trim()) {
-      Alert.alert('Add Content', 'Please write something to share');
-      return;
-    }
-
-    if (!user?.id || !user?.username) {
-      Alert.alert('Error', 'User not logged in');
-      return;
-    }
+    if (!selectedCategory) { Alert.alert('Select Category', 'Please choose a category for your post'); return; }
+    if (!content.trim())   { Alert.alert('Add Content', 'Please write something to share'); return; }
+    if (!user?.id || !user?.username) { Alert.alert('Error', 'User not logged in'); return; }
 
     setLoading(true);
     try {
-      const newPost = await postsAPI.createPost(
-        user.id,
-        user.username,
-        selectedCategory,
-        content.trim()
-      );
-
-      Alert.alert('Success', 'Your post has been shared!');
-      
-      if (onPostCreated) {
-        onPostCreated(newPost);
-      }
-
+      const newPost = await postsAPI.createPost(user.id, user.username, selectedCategory, content.trim());
+      if (onPostCreated) onPostCreated(newPost);
       navigation.goBack();
-    } catch (error) {
-      console.error('Failed to create post:', error);
+    } catch {
       Alert.alert('Error', 'Failed to create post. Please try again.');
     } finally {
       setLoading(false);
@@ -60,202 +40,135 @@ export const CreatePostScreen = ({ route, navigation }: any) => {
   };
 
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.cancelButton}>Cancel</Text>
+          <Text style={styles.cancelBtn}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Share with Community</Text>
-        <TouchableOpacity 
-          onPress={handleSubmit}
-          disabled={loading || !selectedCategory || !content.trim()}
-        >
-          <Text style={[
-            styles.postButton,
-            (loading || !selectedCategory || !content.trim()) && styles.postButtonDisabled
-          ]}>
-            {loading ? 'Posting...' : 'Post'}
-          </Text>
+        <Text style={styles.title}>Share with Community</Text>
+        <TouchableOpacity onPress={handleSubmit} disabled={!canPost}>
+          {loading
+            ? <ActivityIndicator color="#4A9EFF" size="small" />
+            : <Text style={[styles.postBtn, !canPost && styles.postBtnDisabled]}>Post</Text>
+          }
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+
         {/* Category Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Choose Category *</Text>
-          <View style={styles.categoriesGrid}>
-            {CATEGORIES.map((category) => (
+        <Text style={styles.sectionLabel}>CHOOSE CATEGORY</Text>
+        <View style={styles.categoryGrid}>
+          {CATEGORIES.map(cat => {
+            const isSelected = selectedCategory === cat.name;
+            return (
               <TouchableOpacity
-                key={category.name}
+                key={cat.name}
                 style={[
                   styles.categoryCard,
-                  selectedCategory === category.name && styles.categoryCardSelected,
-                  { borderColor: category.color + '40' }
+                  { borderColor: cat.color + '40' },
+                  isSelected && { borderColor: cat.color, backgroundColor: cat.color + '18' },
                 ]}
-                onPress={() => setSelectedCategory(category.name)}
+                onPress={() => setSelectedCategory(cat.name)}
               >
-                <Text style={styles.categoryCardIcon}>{category.icon}</Text>
-                <Text style={[
-                  styles.categoryCardText,
-                  selectedCategory === category.name && { color: category.color }
-                ]}>
-                  {category.name}
+                <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                <Text style={[styles.categoryName, isSelected && { color: cat.color }]}>
+                  {cat.name}
                 </Text>
+                {isSelected && (
+                  <View style={[styles.selectedDot, { backgroundColor: cat.color }]} />
+                )}
               </TouchableOpacity>
-            ))}
-          </View>
+            );
+          })}
         </View>
 
         {/* Content Input */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Your Message *</Text>
+        <Text style={styles.sectionLabel}>YOUR MESSAGE</Text>
+        <View style={styles.inputCard}>
           <TextInput
             style={styles.textInput}
-            placeholder="Share your testimony, request prayer, encourage others, or celebrate a victory..."
-            placeholderTextColor={colors.text.secondary}
+            placeholder="Share your testimony, ask for help, encourage others, or celebrate a victory..."
+            placeholderTextColor="#2a4a7f"
             value={content}
             onChangeText={setContent}
             multiline
             maxLength={1000}
             textAlignVertical="top"
           />
-          <Text style={styles.characterCount}>{content.length}/1000</Text>
+          <Text style={[styles.charCount, content.length > 900 && { color: '#FF6B6B' }]}>
+            {content.length}/1000
+          </Text>
         </View>
 
-        {/* Faith Reminder */}
-        <View style={styles.faithCard}>
-          <Text style={styles.faithIcon}>💝</Text>
-          <View style={styles.faithContent}>
-            <Text style={styles.faithText}>
-              "Therefore encourage one another and build each other up, just as in fact you are doing."
-            </Text>
-            <Text style={styles.faithReference}>1 Thessalonians 5:11</Text>
+        {/* Daily Quote Card */}
+        <View style={styles.quoteCard}>
+          <Text style={styles.quoteIcon}>💬</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.quoteText}>"{quote.text}"</Text>
+            <Text style={styles.quoteRef}>— {quote.author}</Text>
           </View>
         </View>
+
       </ScrollView>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.white
-  },
+  container: { flex: 1, backgroundColor: '#0a1628' },
+
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: 50,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.background.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingTop: 56, paddingBottom: 16, paddingHorizontal: 20,
+    backgroundColor: '#0d1f3c', borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
   },
-  cancelButton: {
-    fontSize: 16,
-    color: colors.text.secondary
+  cancelBtn: { color: '#5a7fa8', fontSize: 16, fontWeight: '600', width: 60 },
+  title: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  postBtn: { color: '#4A9EFF', fontSize: 16, fontWeight: '800', width: 60, textAlign: 'right' },
+  postBtnDisabled: { opacity: 0.3 },
+
+  scroll: { flex: 1 },
+  content: { padding: 16, paddingBottom: 40 },
+
+  sectionLabel: {
+    color: '#5a7fa8', fontSize: 11, fontWeight: '800',
+    letterSpacing: 2, marginBottom: 12, marginTop: 8,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary
-  },
-  postButton: {
-    fontSize: 16,
-    color: colors.accent.blue,
-    fontWeight: '600'
-  },
-  postButtonDisabled: {
-    opacity: 0.3
-  },
-  content: {
-    flex: 1
-  },
-  section: {
-    padding: spacing.lg
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.md
-  },
-  categoriesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md
-  },
+
+  // Categories
+  categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
   categoryCard: {
-    width: '47%',
-    aspectRatio: 1.5,
-    backgroundColor: colors.background.lightGray,
-    borderRadius: borderRadius.medium,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.md
+    width: '47%', aspectRatio: 1.5,
+    backgroundColor: '#0d1f3c', borderRadius: 16,
+    borderWidth: 2, alignItems: 'center', justifyContent: 'center',
+    padding: 12,
   },
-  categoryCardSelected: {
-    backgroundColor: colors.background.white,
-    borderWidth: 3
-  },
-  categoryCardIcon: {
-    fontSize: 32,
-    marginBottom: spacing.xs
-  },
-  categoryCardText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.text.primary,
-    textAlign: 'center'
+  categoryIcon: { fontSize: 28, marginBottom: 6 },
+  categoryName: { color: '#8ab4f8', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  selectedDot: { width: 6, height: 6, borderRadius: 3, marginTop: 6 },
+
+  // Input
+  inputCard: {
+    backgroundColor: '#0d1f3c', borderRadius: 16,
+    padding: 16, marginBottom: 16,
+    borderTopWidth: 3, borderTopColor: '#4A9EFF',
   },
   textInput: {
-    backgroundColor: colors.background.lightGray,
-    borderRadius: borderRadius.small,
-    padding: spacing.md,
-    fontSize: 16,
-    minHeight: 150,
-    textAlignVertical: 'top'
+    color: '#fff', fontSize: 15, lineHeight: 24,
+    minHeight: 150, textAlignVertical: 'top',
   },
-  characterCount: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    textAlign: 'right',
-    marginTop: spacing.xs
+  charCount: { color: '#2a4a7f', fontSize: 12, textAlign: 'right', marginTop: 8 },
+
+  // Quote
+  quoteCard: {
+    flexDirection: 'row', backgroundColor: '#0d1f3c',
+    borderRadius: 16, padding: 18,
+    borderLeftWidth: 3, borderLeftColor: '#4A9EFF',
   },
-  faithCard: {
-    flexDirection: 'row',
-    backgroundColor: colors.accent.blue + '15',
-    margin: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: borderRadius.medium,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.accent.blue
-  },
-  faithIcon: {
-    fontSize: 28,
-    marginRight: spacing.md
-  },
-  faithContent: {
-    flex: 1
-  },
-  faithText: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    color: colors.text.primary,
-    lineHeight: 20,
-    marginBottom: spacing.xs
-  },
-  faithReference: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.accent.blue,
-    textAlign: 'right'
-  }
+  quoteIcon: { fontSize: 24, marginRight: 14 },
+  quoteText: { color: '#c8d8f0', fontSize: 13, fontStyle: 'italic', lineHeight: 20, marginBottom: 6 },
+  quoteRef: { color: '#4A9EFF', fontSize: 12, fontWeight: '600', textAlign: 'right' },
 });

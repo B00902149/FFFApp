@@ -1,381 +1,281 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { colors, spacing, borderRadius } from '../theme/colors';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from 'react-native';
+import { useAuth } from '../context/AuthContext';
+import { exerciseDB, Exercise } from '../services/exerciseDB';
+import { useDailyQuote } from '../hooks/useDailyQuote';
+
+const LEVEL_COLORS: Record<string, string> = {
+  beginner:     '#26de81',
+  intermediate: '#FF9F43',
+  expert:       '#FF6B6B',
+};
+
+const CATEGORY_COLORS: Record<string, string> = {
+  strength:             '#4A9EFF',
+  cardio:               '#FF6B6B',
+  stretching:           '#26de81',
+  plyometrics:          '#FF9F43',
+  powerlifting:         '#7B6FFF',
+  olympic_weightlifting:'#FFD700',
+};
 
 export const ExerciseDetailScreen = ({ route, navigation }: any) => {
-  const { exercise } = route.params || { 
-    exercise: { name: 'Bench Press', sets: 4, reps: '8-10', weight: '60kg' } 
+  const { exercise }: { exercise: Exercise } = route.params;
+  const { user } = useAuth();
+  const quote = useDailyQuote();
+  const [activeImage, setActiveImage] = useState(0);
+
+  const accentColor = CATEGORY_COLORS[exercise.category] || '#4A9EFF';
+  const levelColor = LEVEL_COLORS[exercise.level] || '#4A9EFF';
+
+  const image0 = exercise.images?.[0] ? exerciseDB.getImageUrl(exercise, 0) : null;
+  const image1 = exercise.images?.[1] ? exerciseDB.getImageUrl(exercise, 1) : null;
+
+  const handleAddToWorkout = () => {
+    Alert.alert(
+      'Add to Workout',
+      `Add ${exercise.name} to a workout?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Go to Exercise Screen',
+          onPress: () => navigation.navigate('ExerciseTab')
+        }
+      ]
+    );
   };
-
-  const instructions = [
-    'Lie flat on bench with feet planted firmly on the floor',
-    'Grip the barbell slightly wider than shoulder width',
-    'Lower the bar slowly to mid-chest with controlled motion',
-    'Press the bar up explosively while breathing out',
-    'Lock arms at top without hyperextending elbows',
-    'Repeat for desired number of reps'
-  ];
-
-  const tips = [
-    'Keep your shoulder blades retracted throughout',
-    'Maintain a slight arch in your lower back',
-    'Don\'t bounce the bar off your chest',
-    'Keep your core tight and engaged',
-    'Use a spotter for heavy lifts'
-  ];
 
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backIcon}>←</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Exercise Details</Text>
-        <View style={styles.placeholder} />
+        <Text style={styles.headerTitle}>EXERCISE</Text>
+        <View style={{ width: 60 }} />
       </View>
 
-      {/* Video Player Placeholder */}
-      <View style={styles.videoContainer}>
-        <View style={styles.videoPlaceholder}>
-          <TouchableOpacity style={styles.playButton}>
-            <Text style={styles.playIcon}>▶️</Text>
-          </TouchableOpacity>
-          <Text style={styles.videoLabel}>Exercise Demo Video</Text>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
+
+        {/* Image Viewer */}
+        <View style={styles.imageContainer}>
+          {image0 ? (
+            <Image
+              source={{ uri: activeImage === 0 ? image0 : (image1 || image0) }}
+              style={styles.mainImage}
+              resizeMode="contain"
+            />
+          ) : (
+            <View style={[styles.imagePlaceholder, { backgroundColor: accentColor + '22' }]}>
+              <Text style={styles.imagePlaceholderEmoji}>💪</Text>
+            </View>
+          )}
+
+          {/* Image toggle if 2 images */}
+          {image1 && (
+            <View style={styles.imageToggle}>
+              <TouchableOpacity
+                style={[styles.imageDot, activeImage === 0 && { backgroundColor: accentColor }]}
+                onPress={() => setActiveImage(0)}
+              />
+              <TouchableOpacity
+                style={[styles.imageDot, activeImage === 1 && { backgroundColor: accentColor }]}
+                onPress={() => setActiveImage(1)}
+              />
+            </View>
+          )}
+          {image1 && (
+            <View style={styles.imageSwitcher}>
+              <TouchableOpacity
+                style={[styles.imageSwitchBtn, activeImage === 0 && { borderColor: accentColor }]}
+                onPress={() => setActiveImage(0)}
+              >
+                <Text style={styles.imageSwitchLabel}>Start</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.imageSwitchBtn, activeImage === 1 && { borderColor: accentColor }]}
+                onPress={() => setActiveImage(1)}
+              >
+                <Text style={styles.imageSwitchLabel}>End</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
-      </View>
 
-      <ScrollView style={styles.content} contentContainerStyle={styles.scrollContent}>
-        {/* Exercise Info */}
-        <View style={styles.infoSection}>
+        {/* Name + Badges */}
+        <View style={[styles.card, { borderTopColor: accentColor }]}>
           <Text style={styles.exerciseName}>{exercise.name}</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statBox}>
-              <Text style={styles.statLabel}>Sets</Text>
-              <Text style={styles.statValue}>{exercise.sets}</Text>
+          <View style={styles.badgeRow}>
+            <View style={[styles.badge, { backgroundColor: accentColor + '22' }]}>
+              <Text style={[styles.badgeText, { color: accentColor }]}>
+                {exercise.category}
+              </Text>
             </View>
-            <View style={styles.statBox}>
-              <Text style={styles.statLabel}>Reps</Text>
-              <Text style={styles.statValue}>{exercise.reps}</Text>
+            <View style={[styles.badge, { backgroundColor: levelColor + '22' }]}>
+              <Text style={[styles.badgeText, { color: levelColor }]}>
+                {exercise.level}
+              </Text>
             </View>
-            {exercise.weight && (
-              <View style={styles.statBox}>
-                <Text style={styles.statLabel}>Weight</Text>
-                <Text style={styles.statValue}>{exercise.weight}</Text>
+            {exercise.equipment && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>🏋️ {exercise.equipment}</Text>
+              </View>
+            )}
+            {exercise.force && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {exercise.force === 'push' ? '⬆️' : exercise.force === 'pull' ? '⬇️' : '↔️'} {exercise.force}
+                </Text>
               </View>
             )}
           </View>
         </View>
 
-        {/* Pre-Training Notes */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pre-Training Notes</Text>
-          <View style={styles.noteCard}>
-            <Text style={styles.noteIcon}>⚠️</Text>
-            <Text style={styles.noteText}>
-              Warm up chest and shoulders thoroughly before starting. Focus on form over weight. 
-              Keep core tight throughout the movement.
-            </Text>
+        {/* Muscles */}
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>MUSCLES</Text>
+          <View style={styles.muscleSection}>
+            <Text style={styles.muscleGroupLabel}>Primary</Text>
+            <View style={styles.muscleChips}>
+              {exercise.primaryMuscles.map(m => (
+                <View key={m} style={[styles.muscleChip, { backgroundColor: accentColor + '22', borderColor: accentColor + '44' }]}>
+                  <Text style={[styles.muscleChipText, { color: accentColor }]}>{m}</Text>
+                </View>
+              ))}
+            </View>
           </View>
-        </View>
-
-        {/* How To Instructions */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>How To Perform</Text>
-          {instructions.map((instruction, index) => (
-            <View key={index} style={styles.instructionRow}>
-              <View style={styles.stepNumber}>
-                <Text style={styles.stepText}>{index + 1}</Text>
+          {exercise.secondaryMuscles.length > 0 && (
+            <View style={styles.muscleSection}>
+              <Text style={styles.muscleGroupLabel}>Secondary</Text>
+              <View style={styles.muscleChips}>
+                {exercise.secondaryMuscles.map(m => (
+                  <View key={m} style={styles.muscleChipSecondary}>
+                    <Text style={styles.muscleChipTextSecondary}>{m}</Text>
+                  </View>
+                ))}
               </View>
-              <Text style={styles.instructionText}>{instruction}</Text>
             </View>
-          ))}
+          )}
         </View>
 
-        {/* Pro Tips */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Pro Tips</Text>
-          {tips.map((tip, index) => (
-            <View key={index} style={styles.tipRow}>
-              <Text style={styles.tipBullet}>💡</Text>
-              <Text style={styles.tipText}>{tip}</Text>
-            </View>
-          ))}
-        </View>
+        {/* Instructions */}
+        {exercise.instructions.length > 0 && (
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>HOW TO PERFORM</Text>
+            {exercise.instructions.map((step, i) => (
+              <View key={i} style={styles.stepRow}>
+                <View style={[styles.stepBadge, { backgroundColor: accentColor }]}>
+                  <Text style={styles.stepNum}>{i + 1}</Text>
+                </View>
+                <Text style={styles.stepText}>{step}</Text>
+              </View>
+            ))}
+          </View>
+        )}
 
-        {/* Faith Integration */}
-        <View style={styles.faithCard}>
-          <Text style={styles.faithIcon}>💪</Text>
-          <View style={styles.faithContent}>
-            <Text style={styles.faithTitle}>Strength Through Faith</Text>
-            <Text style={styles.faithText}>
-              "But those who hope in the Lord will renew their strength. They will soar on wings 
-              like eagles; they will run and not grow weary, they will walk and not be faint."
-            </Text>
-            <Text style={styles.faithReference}>Isaiah 40:31</Text>
+        {/* Daily Quote */}
+        <View style={styles.quoteCard}>
+          <Text style={styles.quoteIcon}>💬</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.quoteText}>"{quote.text}"</Text>
+            <Text style={styles.quoteRef}>— {quote.author}</Text>
           </View>
         </View>
 
         {/* Action Buttons */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity 
-            style={styles.primaryButton}
+        <View style={styles.actions}>
+          <TouchableOpacity
+            style={[styles.primaryBtn, { backgroundColor: accentColor }]}
+            onPress={handleAddToWorkout}
+          >
+            <Text style={styles.primaryBtnText}>+ Add to Workout</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.secondaryBtn, { borderColor: accentColor }]}
             onPress={() => navigation.goBack()}
           >
-            <Text style={styles.primaryButtonText}>Return to Workout</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.secondaryButton}
-            onPress={() => console.log('Add to custom workout')}
-          >
-            <Text style={styles.secondaryButtonText}>Add to Custom Workout</Text>
+            <Text style={[styles.secondaryBtnText, { color: accentColor }]}>← Back to Search</Text>
           </TouchableOpacity>
         </View>
+
+        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.white
-  },
+  container: { flex: 1, backgroundColor: '#0a1628' },
+
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingTop: 50,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.background.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingTop: 56, paddingBottom: 16, paddingHorizontal: 20,
+    backgroundColor: '#0d1f3c', borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.accent.blue + '15',
-    alignItems: 'center',
-    justifyContent: 'center'
+  backBtn: { width: 60 },
+  backText: { color: '#4A9EFF', fontSize: 16, fontWeight: '600' },
+  headerTitle: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 2 },
+
+  content: { paddingBottom: 20 },
+
+  // Image
+  imageContainer: {
+    backgroundColor: '#0d1f3c', borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
+    alignItems: 'center', paddingVertical: 16,
   },
-  backIcon: {
-    fontSize: 24,
-    color: colors.accent.blue,
-    fontWeight: 'bold'
+  mainImage: { width: '80%', height: 220 },
+  imagePlaceholder: { width: '80%', height: 220, alignItems: 'center', justifyContent: 'center', borderRadius: 12 },
+  imagePlaceholderEmoji: { fontSize: 64 },
+  imageToggle: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  imageDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#1a3a6b' },
+  imageSwitcher: { flexDirection: 'row', gap: 12, marginTop: 8 },
+  imageSwitchBtn: { paddingHorizontal: 20, paddingVertical: 6, borderRadius: 12, borderWidth: 1, borderColor: '#1a3a6b' },
+  imageSwitchLabel: { color: '#8ab4f8', fontSize: 12, fontWeight: '700' },
+
+  // Cards
+  card: {
+    backgroundColor: '#0d1f3c', borderRadius: 16,
+    margin: 16, marginBottom: 0, padding: 18,
+    borderTopWidth: 3, borderTopColor: '#1a3a6b', elevation: 4,
   },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    flex: 1,
-    textAlign: 'center'
+  cardLabel: { color: '#5a7fa8', fontSize: 11, fontWeight: '800', letterSpacing: 2, marginBottom: 14 },
+
+  // Name + Badges
+  exerciseName: { color: '#fff', fontSize: 22, fontWeight: '800', marginBottom: 14 },
+  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, backgroundColor: '#1a3a6b' },
+  badgeText: { color: '#8ab4f8', fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
+
+  // Muscles
+  muscleSection: { marginBottom: 12 },
+  muscleGroupLabel: { color: '#5a7fa8', fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 8 },
+  muscleChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  muscleChip: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1 },
+  muscleChipText: { fontSize: 12, fontWeight: '700', textTransform: 'capitalize' },
+  muscleChipSecondary: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, backgroundColor: '#1a3a6b' },
+  muscleChipTextSecondary: { color: '#5a7fa8', fontSize: 12, fontWeight: '600', textTransform: 'capitalize' },
+
+  // Steps
+  stepRow: { flexDirection: 'row', marginBottom: 14, alignItems: 'flex-start' },
+  stepBadge: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center', marginRight: 12, marginTop: 2 },
+  stepNum: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  stepText: { flex: 1, color: '#c8d8f0', fontSize: 14, lineHeight: 22 },
+
+  // Quote
+  quoteCard: {
+    flexDirection: 'row', backgroundColor: '#0d1f3c',
+    margin: 16, marginBottom: 0, borderRadius: 16, padding: 18,
+    borderLeftWidth: 3, borderLeftColor: '#4A9EFF',
   },
-  placeholder: {
-    width: 40
-  },
-  videoContainer: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-    backgroundColor: '#000'
-  },
-  videoPlaceholder: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.primary.dark
-  },
-  playButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.md
-  },
-  playIcon: {
-    fontSize: 30
-  },
-  videoLabel: {
-    color: colors.text.white,
-    fontSize: 14,
-    opacity: 0.8
-  },
-  content: {
-    flex: 1
-  },
-  scrollContent: {
-    paddingBottom: 100
-  },
-  infoSection: {
-    padding: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
-  },
-  exerciseName: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    marginBottom: spacing.md
-  },
-  statsRow: {
-    flexDirection: 'row',
-    gap: spacing.md
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: colors.background.lightGray,
-    borderRadius: borderRadius.small,
-    padding: spacing.md,
-    alignItems: 'center'
-  },
-  statLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginBottom: 4
-  },
-  statValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary
-  },
-  section: {
-    padding: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.md
-  },
-  noteCard: {
-    flexDirection: 'row',
-    backgroundColor: colors.accent.yellow + '15',
-    borderRadius: borderRadius.small,
-    padding: spacing.md,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.accent.yellow
-  },
-  noteIcon: {
-    fontSize: 20,
-    marginRight: spacing.sm
-  },
-  noteText: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.text.primary,
-    lineHeight: 20
-  },
-  instructionRow: {
-    flexDirection: 'row',
-    marginBottom: spacing.md,
-    alignItems: 'flex-start'
-  },
-  stepNumber: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: colors.accent.blue,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md
-  },
-  stepText: {
-    color: colors.text.white,
-    fontWeight: 'bold',
-    fontSize: 14
-  },
-  instructionText: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.text.primary,
-    lineHeight: 22
-  },
-  tipRow: {
-    flexDirection: 'row',
-    marginBottom: spacing.sm,
-    alignItems: 'flex-start'
-  },
-  tipBullet: {
-    fontSize: 16,
-    marginRight: spacing.sm,
-    marginTop: 2
-  },
-  tipText: {
-    flex: 1,
-    fontSize: 14,
-    color: colors.text.primary,
-    lineHeight: 20
-  },
-  faithCard: {
-    flexDirection: 'row',
-    backgroundColor: colors.accent.blue + '15',
-    margin: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: borderRadius.medium,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.accent.blue
-  },
-  faithIcon: {
-    fontSize: 32,
-    marginRight: spacing.md
-  },
-  faithContent: {
-    flex: 1
-  },
-  faithTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.xs
-  },
-  faithText: {
-    fontSize: 14,
-    fontStyle: 'italic',
-    color: colors.text.primary,
-    lineHeight: 20,
-    marginBottom: spacing.xs
-  },
-  faithReference: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.accent.blue,
-    textAlign: 'right'
-  },
-  actionButtons: {
-    padding: spacing.lg,
-    gap: spacing.md
-  },
-  primaryButton: {
-    backgroundColor: colors.accent.blue,
-    borderRadius: borderRadius.medium,
-    padding: spacing.lg,
-    alignItems: 'center'
-  },
-  primaryButtonText: {
-    color: colors.text.white,
-    fontSize: 16,
-    fontWeight: '600'
-  },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: colors.accent.blue,
-    borderRadius: borderRadius.medium,
-    padding: spacing.lg,
-    alignItems: 'center'
-  },
-  secondaryButtonText: {
-    color: colors.accent.blue,
-    fontSize: 16,
-    fontWeight: '600'
-  }
+  quoteIcon: { fontSize: 24, marginRight: 14 },
+  quoteText: { color: '#c8d8f0', fontSize: 13, fontStyle: 'italic', lineHeight: 20, marginBottom: 6 },
+  quoteRef: { color: '#4A9EFF', fontSize: 12, fontWeight: '600', textAlign: 'right' },
+
+  // Actions
+  actions: { margin: 16, gap: 12 },
+  primaryBtn: { borderRadius: 16, padding: 16, alignItems: 'center' },
+  primaryBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  secondaryBtn: { borderRadius: 16, padding: 16, alignItems: 'center', borderWidth: 1, backgroundColor: 'transparent' },
+  secondaryBtnText: { fontSize: 16, fontWeight: '700' },
 });

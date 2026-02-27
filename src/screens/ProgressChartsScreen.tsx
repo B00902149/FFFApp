@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Dimensions, ActivityIndicator } from 'react-native';
-import { colors, spacing, borderRadius } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
-import { profileAPI } from '../services/api';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -11,18 +9,12 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(true);
   const [weightData, setWeightData] = useState<any[]>([]);
 
-  useEffect(() => {
-    loadProgressData();
-  }, []);
+  useEffect(() => { loadProgressData(); }, []);
 
   const loadProgressData = async () => {
     try {
       setLoading(true);
-      
-      // For now, generate sample data
-      const sampleData = generateSampleWeightData();
-      setWeightData(sampleData);
-      
+      setWeightData(generateSampleWeightData());
     } catch (error) {
       console.error('Load progress error:', error);
     } finally {
@@ -34,80 +26,63 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
     const data = [];
     const today = new Date();
     let currentWeight = 75;
-
     for (let i = 29; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
-      
       currentWeight += (Math.random() - 0.5) * 0.5;
-      
       data.push({
-        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        date: date.toLocaleDateString('en-GB', { month: 'short', day: 'numeric' }),
         weight: Math.round(currentWeight * 10) / 10
       });
     }
-    
     return data;
   };
 
   const renderWeightChart = () => {
-  if (weightData.length === 0) return null;
+    if (weightData.length === 0) return null;
 
-  const maxWeight = Math.max(...weightData.map(d => d.weight));
-  const minWeight = Math.min(...weightData.map(d => d.weight));
-  const range = maxWeight - minWeight || 1;
-  
-  // Add padding to range for better visualization
-  const paddedMax = maxWeight + (range * 0.1);
-  const paddedMin = minWeight - (range * 0.1);
-  const paddedRange = paddedMax - paddedMin;
-  
-  const chartHeight = 180; // Reduced slightly
-  const chartWidth = screenWidth - (spacing.lg * 2) - 50; // More space for y-axis
-  const horizontalPadding = 10; // Add padding on sides
-  const usableWidth = chartWidth - (horizontalPadding * 2);
-  const pointWidth = usableWidth / (weightData.length - 1);
+    const maxWeight = Math.max(...weightData.map(d => d.weight));
+    const minWeight = Math.min(...weightData.map(d => d.weight));
+    const range = maxWeight - minWeight || 1;
+    const paddedMax = maxWeight + range * 0.15;
+    const paddedMin = minWeight - range * 0.15;
+    const paddedRange = paddedMax - paddedMin;
 
-  return (
-    <View style={styles.chartContainer}>
-      <View style={styles.chartHeader}>
-        <Text style={styles.chartTitle}>Weight Progress</Text>
-        <Text style={styles.chartRange}>
-          {minWeight.toFixed(1)}kg - {maxWeight.toFixed(1)}kg
-        </Text>
-      </View>
+    const chartHeight = 160;
+    const chartWidth = screenWidth - 80;
+    const pointWidth = chartWidth / (weightData.length - 1);
 
-      <View style={styles.chart}>
-        {/* Y-axis labels */}
-        <View style={styles.yAxis}>
-          <Text style={styles.yAxisLabel}>{paddedMax.toFixed(1)}</Text>
-          <Text style={styles.yAxisLabel}>{((paddedMax + paddedMin) / 2).toFixed(1)}</Text>
-          <Text style={styles.yAxisLabel}>{paddedMin.toFixed(1)}</Text>
-        </View>
+    const current = weightData[weightData.length - 1].weight;
+    const start = weightData[0].weight;
+    const change = current - start;
+    const avg = weightData.reduce((s, d) => s + d.weight, 0) / weightData.length;
 
-        {/* Chart area with boundary */}
-        <View style={[styles.chartArea, { width: chartWidth }]}>
-          {/* Background grid lines */}
-          <View style={[styles.gridLines, { height: chartHeight }]}>
-            <View style={styles.gridLine} />
-            <View style={styles.gridLine} />
-            <View style={styles.gridLine} />
-            <View style={styles.gridLine} />
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>WEIGHT PROGRESS</Text>
+
+        {/* Chart */}
+        <View style={styles.chartRow}>
+          {/* Y Axis */}
+          <View style={[styles.yAxis, { height: chartHeight }]}>
+            <Text style={styles.axisLabel}>{paddedMax.toFixed(1)}</Text>
+            <Text style={styles.axisLabel}>{((paddedMax + paddedMin) / 2).toFixed(1)}</Text>
+            <Text style={styles.axisLabel}>{paddedMin.toFixed(1)}</Text>
           </View>
 
-          {/* Data points container with clipping */}
-          <View style={[styles.pointsContainer, { height: chartHeight }]}>
+          {/* Chart Area */}
+          <View style={[styles.chartArea, { width: chartWidth, height: chartHeight }]}>
+            {/* Grid lines */}
+            {[0, 1, 2, 3].map(i => (
+              <View key={i} style={[styles.gridLine, { top: (chartHeight / 3) * i }]} />
+            ))}
+
+            {/* Points */}
             {weightData.map((point, index) => {
-              // Calculate position with padding
               const normalizedY = (point.weight - paddedMin) / paddedRange;
-              const y = chartHeight - (normalizedY * chartHeight);
-              const x = horizontalPadding + (index * pointWidth);
-
-              // Strict bounds checking
-              if (x < 0 || x > chartWidth || y < 0 || y > chartHeight) {
-                return null;
-              }
-
+              const y = chartHeight - normalizedY * chartHeight;
+              const x = index * pointWidth;
+              const isLast = index === weightData.length - 1;
               return (
                 <View
                   key={index}
@@ -115,278 +90,148 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
                     position: 'absolute',
                     left: Math.max(0, Math.min(chartWidth - 8, x - 4)),
                     top: Math.max(0, Math.min(chartHeight - 8, y - 4)),
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: colors.accent.blue,
-                    shadowColor: colors.accent.blue,
-                    shadowOffset: { width: 0, height: 1 },
-                    shadowOpacity: 0.5,
-                    shadowRadius: 2,
-                    elevation: 2
+                    width: isLast ? 12 : 7,
+                    height: isLast ? 12 : 7,
+                    borderRadius: isLast ? 6 : 3.5,
+                    backgroundColor: isLast ? '#fff' : '#4A9EFF',
+                    borderWidth: isLast ? 2 : 0,
+                    borderColor: '#4A9EFF',
                   }}
                 />
               );
             })}
           </View>
+        </View>
 
-          {/* X-axis labels - show fewer to prevent overlap */}
-          <View style={styles.xAxis}>
-            {weightData.map((point, index) => {
-              // Show first, middle, last, and every 7th day
-              const showLabel = index === 0 || 
-                               index === Math.floor(weightData.length / 2) || 
-                               index === weightData.length - 1 ||
-                               index % 7 === 0;
-              
-              if (showLabel) {
-                return (
-                  <Text key={index} style={styles.xAxisLabel}>
-                    {point.date}
-                  </Text>
-                );
-              }
-              return null;
-            })}
-          </View>
+        {/* X axis labels */}
+        <View style={styles.xAxis}>
+          {['30d ago', '3 weeks', '2 weeks', '1 week', 'Today'].map(label => (
+            <Text key={label} style={styles.axisLabel}>{label}</Text>
+          ))}
+        </View>
+
+        {/* Stats */}
+        <View style={styles.statsRow}>
+          {[
+            { label: 'Current',  value: `${current.toFixed(1)}kg`, color: '#4A9EFF' },
+            { label: 'Change',   value: `${change >= 0 ? '+' : ''}${change.toFixed(1)}kg`, color: change < 0 ? '#26de81' : '#FF6B6B' },
+            { label: 'Average',  value: `${avg.toFixed(1)}kg`, color: '#FFD700' },
+          ].map((stat, i) => (
+            <React.Fragment key={stat.label}>
+              <View style={styles.statItem}>
+                <Text style={[styles.statValue, { color: stat.color }]}>{stat.value}</Text>
+                <Text style={styles.statLabel}>{stat.label}</Text>
+              </View>
+              {i < 2 && <View style={styles.statDivider} />}
+            </React.Fragment>
+          ))}
         </View>
       </View>
-
-      {/* Stats */}
-      <View style={styles.statsRow}>
-        <View style={styles.statBox}>
-          <Text style={styles.statLabel}>Current</Text>
-          <Text style={styles.statValue}>{weightData[weightData.length - 1].weight}kg</Text>
-        </View>
-        <View style={styles.statBox}>
-          <Text style={styles.statLabel}>Change</Text>
-          <Text style={[
-            styles.statValue,
-            { color: (weightData[weightData.length - 1].weight - weightData[0].weight) < 0 ? colors.accent.green : colors.accent.red }
-          ]}>
-            {(weightData[weightData.length - 1].weight - weightData[0].weight).toFixed(1)}kg
-          </Text>
-        </View>
-        <View style={styles.statBox}>
-          <Text style={styles.statLabel}>Avg</Text>
-          <Text style={styles.statValue}>
-            {(weightData.reduce((sum, d) => sum + d.weight, 0) / weightData.length).toFixed(1)}kg
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-};
+    );
+  };
 
   if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.backIcon}>←</Text>
-          </TouchableOpacity>
-          <Text style={styles.title}>Progress Charts</Text>
-        </View>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.text.white} />
-        </View>
+      <View style={styles.centered}>
+        <ActivityIndicator size="large" color="#4A9EFF" />
+        <Text style={styles.loadingText}>Loading progress...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {/* Header with visible back button */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backIcon}>←</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.title}>Progress Charts</Text>
+        <Text style={styles.title}>PROGRESS</Text>
+        <View style={{ width: 60 }} />
       </View>
 
-      <ScrollView style={styles.content}>
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
         {renderWeightChart()}
 
-        <View style={styles.comingSoonCard}>
-          <Text style={styles.comingSoonTitle}>📊 Coming Soon</Text>
-          <Text style={styles.comingSoonText}>
-            • Calorie Trends{'\n'}
-            • Workout Volume{'\n'}
-            • Body Measurements{'\n'}
-            • Personal Records
-          </Text>
+        {/* Coming Soon */}
+        <View style={styles.card}>
+          <Text style={styles.cardLabel}>COMING SOON</Text>
+          {[
+            { icon: '🔥', label: 'Calorie Trends' },
+            { icon: '🏋️', label: 'Workout Volume' },
+            { icon: '📏', label: 'Body Measurements' },
+            { icon: '🏆', label: 'Personal Records' },
+          ].map(item => (
+            <View key={item.label} style={styles.comingRow}>
+              <Text style={styles.comingIcon}>{item.icon}</Text>
+              <Text style={styles.comingLabel}>{item.label}</Text>
+              <View style={styles.comingSoon}>
+                <Text style={styles.comingSoonText}>Soon</Text>
+              </View>
+            </View>
+          ))}
         </View>
 
-        <View style={styles.bottomSpacer} />
+        <View style={{ height: 40 }} />
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.primary.dark
-  },
+  container: { flex: 1, backgroundColor: '#0a1628' },
+  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a1628' },
+  loadingText: { color: '#8ab4f8', marginTop: 12 },
+
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingTop: 50,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.primary.dark,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.1)'
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingTop: 56, paddingBottom: 16, paddingHorizontal: 20,
+    backgroundColor: '#0d1f3c', borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.accent.blue,  // More visible
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md
+  backBtn: { width: 60 },
+  backText: { color: '#4A9EFF', fontSize: 16, fontWeight: '600' },
+  title: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 2 },
+
+  content: { padding: 16 },
+
+  card: {
+    backgroundColor: '#0d1f3c', borderRadius: 16,
+    padding: 18, marginBottom: 14,
+    borderTopWidth: 3, borderTopColor: '#4A9EFF', elevation: 4,
   },
-  backIcon: {
-    fontSize: 24,
-    color: colors.text.white,
-    fontWeight: 'bold'
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: colors.text.white
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  content: {
-    flex: 1,
-    padding: spacing.lg
-  },
-  chartContainer: {
-    backgroundColor: colors.background.white,
-    borderRadius: borderRadius.medium,
-    padding: spacing.lg,
-    marginBottom: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3
-  },
-  chartHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg
-  },
-  chartTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text.primary
-  },
-  chartRange: {
-    fontSize: 14,
-    color: colors.text.secondary
-  },
-  chart: {
-    flexDirection: 'row'
-  },
-  yAxis: {
-    justifyContent: 'space-between',
-    height: 200,
-    marginRight: spacing.sm,
-    width: 35
-  },
-  yAxisLabel: {
-    fontSize: 10,
-    color: colors.text.secondary,
-    textAlign: 'right'
-  },
+  cardLabel: { color: '#5a7fa8', fontSize: 11, fontWeight: '800', letterSpacing: 2, marginBottom: 16 },
+
+  // Chart
+  chartRow: { flexDirection: 'row', marginBottom: 8 },
+  yAxis: { width: 38, justifyContent: 'space-between', paddingRight: 6 },
+  axisLabel: { color: '#2a4a7f', fontSize: 9, fontWeight: '600', textAlign: 'right' },
   chartArea: {
-  flex: 1,
-  overflow: 'hidden',  // Critical: clip overflow
-  backgroundColor: '#FAFAFA', // Subtle background to see bounds
-  borderRadius: 4
-},
-gridLines: {
-  position: 'absolute',
-  left: 0,
-  right: 0,
-  top: 0,
-  bottom: 0,
-  justifyContent: 'space-between',
-  paddingVertical: 0
-},
-gridLine: {
-  height: 1,
-  backgroundColor: colors.background.lightGray,
-  opacity: 0.3
-},
-pointsContainer: {
-  position: 'relative',
-  overflow: 'hidden'  // Double clip for safety
-},
-xAxis: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  marginTop: spacing.sm,
-  paddingHorizontal: 10
-},
-xAxisLabel: {
-  fontSize: 9,
-  color: colors.text.secondary
-},
-  statsRow: {
-    flexDirection: 'row',
-    marginTop: spacing.lg,
-    gap: spacing.md
+    flex: 1, backgroundColor: '#0a1628',
+    borderRadius: 8, overflow: 'hidden',
   },
-  statBox: {
-    flex: 1,
-    backgroundColor: colors.background.lightGray,
-    padding: spacing.md,
-    borderRadius: borderRadius.small,
-    alignItems: 'center'
+  gridLine: {
+    position: 'absolute', left: 0, right: 0,
+    height: 1, backgroundColor: '#1a3a6b',
   },
-  statLabel: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginBottom: 4
+  xAxis: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    paddingLeft: 44, marginBottom: 16,
   },
-  statValue: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary
+
+  // Stats
+  statsRow: { flexDirection: 'row', backgroundColor: '#0a1628', borderRadius: 12, padding: 14 },
+  statItem: { flex: 1, alignItems: 'center' },
+  statValue: { fontSize: 20, fontWeight: '800', marginBottom: 4 },
+  statLabel: { color: '#5a7fa8', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
+  statDivider: { width: 1, backgroundColor: '#1a3a6b', marginHorizontal: 8 },
+
+  // Coming soon
+  comingRow: {
+    flexDirection: 'row', alignItems: 'center',
+    paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
   },
-  comingSoonCard: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    padding: spacing.lg,
-    borderRadius: borderRadius.medium,
-    borderLeftWidth: 4,
-    borderLeftColor: colors.accent.blue
-  },
-  comingSoonTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.white,
-    marginBottom: spacing.sm
-  },
-  comingSoonText: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-    lineHeight: 24
-  },
-  bottomSpacer: {
-    height: 40
-  }
+  comingIcon: { fontSize: 22, marginRight: 14 },
+  comingLabel: { flex: 1, color: '#8ab4f8', fontSize: 14, fontWeight: '600' },
+  comingSoon: { backgroundColor: '#1a3a6b', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  comingSoonText: { color: '#4A9EFF', fontSize: 11, fontWeight: '700' },
 });

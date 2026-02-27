@@ -1,88 +1,55 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, ActivityIndicator} from 'react-native';
-import { colors, spacing, borderRadius } from '../theme/colors';
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { postsAPI } from '../services/api';
 
+const CATEGORY_CONFIG: Record<string, { icon: string; color: string }> = {
+  'Help Request':  { icon: '🆘', color: '#7B6FFF' },
+  'Testimony':     { icon: '✨', color: '#FFD700' },
+  'Encouragement': { icon: '💪', color: '#26de81' },
+  'Victory':       { icon: '🎉', color: '#FF9F43' },
+  'default':       { icon: '📝', color: '#4A9EFF' },
+};
+
+const getTimeAgo = (dateString: string) => {
+  const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
+  if (seconds < 60) return 'just now';
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return new Date(dateString).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
+};
 
 export const PostDetailScreen = ({ route, navigation }: any) => {
   const { user } = useAuth();
   const { post: initialPost, onUpdate } = route.params || {};
-
   const [post, setPost] = useState(initialPost);
   const [commentText, setCommentText] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'Prayer Request': return '🙏';
-      case 'Testimony': return '✨';
-      case 'Encouragement': return '💪';
-      case 'Victory': return '🎉';
-      default: return '📝';
-    }
-  };
-
-  const getCategoryColor = (category: string) => {
-    switch (category) {
-      case 'Prayer Request': return colors.accent.blue;
-      case 'Testimony': return colors.accent.yellow;
-      case 'Encouragement': return colors.accent.green;
-      case 'Victory': return colors.accent.red;
-      default: return colors.text.secondary;
-    }
-  };
-
-  const getTimeAgo = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
-
-    if (seconds < 60) return 'just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-    return date.toLocaleDateString();
-  };
+  const cfg = CATEGORY_CONFIG[post.category] || CATEGORY_CONFIG['default'];
+  const isLiked = user?.id ? post.likes.includes(user.id) : false;
+  const isOwnPost = user?.id === post.userId;
 
   const handleLike = async () => {
     if (!user?.id) return;
-
     try {
-      const updatedPost = await postsAPI.likePost(post._id, user.id);
-      setPost(updatedPost);
-      if (onUpdate) onUpdate(updatedPost);
-    } catch (error) {
-      console.error('Failed to like post:', error);
-    }
+      const updated = await postsAPI.likePost(post._id, user.id);
+      setPost(updated);
+      if (onUpdate) onUpdate(updated);
+    } catch { console.error('Failed to like post'); }
   };
 
   const handleAddComment = async () => {
-    if (!commentText.trim()) {
-      Alert.alert('Add Comment', 'Please write a comment');
-      return;
-    }
-
-    if (!user?.id || !user?.username) {
-      Alert.alert('Error', 'User not logged in');
-      return;
-    }
-
+    if (!commentText.trim()) return;
+    if (!user?.id || !user?.username) { Alert.alert('Error', 'User not logged in'); return; }
     setSubmitting(true);
     try {
-      const updatedPost = await postsAPI.addComment(
-        post._id,
-        user.id,
-        user.username,
-        commentText.trim()
-      );
-
-      setPost(updatedPost);
-      if (onUpdate) onUpdate(updatedPost);
+      const updated = await postsAPI.addComment(post._id, user.id, user.username, commentText.trim());
+      setPost(updated);
+      if (onUpdate) onUpdate(updated);
       setCommentText('');
-      Alert.alert('Success', 'Comment added!');
-    } catch (error) {
-      console.error('Failed to add comment:', error);
+    } catch {
       Alert.alert('Error', 'Failed to add comment');
     } finally {
       setSubmitting(false);
@@ -90,69 +57,52 @@ export const PostDetailScreen = ({ route, navigation }: any) => {
   };
 
   const handleDeletePost = async () => {
-    if (!user?.id) return;
-
-    // Check if user owns the post
-    if (post.userId !== user.id) {
+    if (!user?.id || post.userId !== user.id) {
       Alert.alert('Not Authorized', 'You can only delete your own posts');
       return;
     }
-
-    Alert.alert(
-      'Delete Post',
-      'Are you sure you want to delete this post?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await postsAPI.deletePost(post._id, user.id);
-              Alert.alert('Deleted', 'Post has been deleted');
-              navigation.goBack();
-            } catch (error) {
-              console.error('Failed to delete post:', error);
-              Alert.alert('Error', 'Failed to delete post');
-            }
+    Alert.alert('Delete Post', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete', style: 'destructive', onPress: async () => {
+          try {
+            await postsAPI.deletePost(post._id, user.id);
+            navigation.goBack();
+          } catch {
+            Alert.alert('Error', 'Failed to delete post');
           }
         }
-      ]
-    );
+      }
+    ]);
   };
 
-  const isLiked = user?.id ? post.likes.includes(user.id) : false;
-  const isOwnPost = user?.id === post.userId;
-
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'android' ? 0 : 0}
     >
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Text style={styles.backIcon}>←</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Post</Text>
-        {isOwnPost && (
-          <TouchableOpacity onPress={handleDeletePost}>
-            <Text style={styles.deleteButton}>🗑️</Text>
-          </TouchableOpacity>
-        )}
-        {!isOwnPost && <View style={styles.placeholder} />}
+        <Text style={styles.title}>POST</Text>
+        {isOwnPost
+          ? <TouchableOpacity onPress={handleDeletePost} style={styles.deleteBtn}>
+              <Text style={styles.deleteBtnText}>🗑️</Text>
+            </TouchableOpacity>
+          : <View style={{ width: 60 }} />
+        }
       </View>
 
-      <ScrollView style={styles.content}>
-        {/* Original Post */}
-        <View style={styles.postCard}>
+      <ScrollView style={styles.scroll} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+        {/* Post Card */}
+        <View style={[styles.postCard, { borderTopColor: cfg.color }]}>
           <View style={styles.postHeader}>
-            <View style={styles.avatarContainer}>
-              <Text style={styles.avatar}>
+            <View style={[styles.avatar, { backgroundColor: cfg.color + '30' }]}>
+              <Text style={[styles.avatarText, { color: cfg.color }]}>
                 {post.username.charAt(0).toUpperCase()}
               </Text>
             </View>
@@ -160,41 +110,22 @@ export const PostDetailScreen = ({ route, navigation }: any) => {
               <Text style={styles.username}>{post.username}</Text>
               <Text style={styles.timestamp}>{getTimeAgo(post.createdAt)}</Text>
             </View>
-            <View 
-              style={[
-                styles.categoryBadge,
-                { backgroundColor: getCategoryColor(post.category) + '20' }
-              ]}
-            >
-              <Text style={styles.categoryIcon}>{getCategoryIcon(post.category)}</Text>
+            <View style={[styles.categoryPill, { backgroundColor: cfg.color + '20' }]}>
+              <Text style={styles.categoryPillIcon}>{cfg.icon}</Text>
+              <Text style={[styles.categoryPillText, { color: cfg.color }]}>{post.category}</Text>
             </View>
-          </View>
-
-          <View style={styles.categoryLabelContainer}>
-            <Text 
-              style={[
-                styles.categoryLabel,
-                { color: getCategoryColor(post.category) }
-              ]}
-            >
-              {post.category}
-            </Text>
           </View>
 
           <Text style={styles.postContent}>{post.content}</Text>
 
           <View style={styles.postActions}>
-            <TouchableOpacity 
-              style={styles.actionButton}
-              onPress={handleLike}
-            >
+            <TouchableOpacity style={styles.actionBtn} onPress={handleLike}>
               <Text style={styles.actionIcon}>{isLiked ? '❤️' : '🤍'}</Text>
-              <Text style={styles.actionText}>
+              <Text style={[styles.actionText, isLiked && { color: '#FF6B6B' }]}>
                 {post.likes.length} {post.likes.length === 1 ? 'Like' : 'Likes'}
               </Text>
             </TouchableOpacity>
-
-            <View style={styles.actionButton}>
+            <View style={styles.actionBtn}>
               <Text style={styles.actionIcon}>💬</Text>
               <Text style={styles.actionText}>
                 {post.comments.length} {post.comments.length === 1 ? 'Comment' : 'Comments'}
@@ -203,17 +134,15 @@ export const PostDetailScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
-        {/* Comments Section */}
-        <View style={styles.commentsSection}>
-          <Text style={styles.commentsTitle}>
-            Comments ({post.comments.length})
-          </Text>
+        {/* Comments */}
+        <View style={styles.commentsCard}>
+          <Text style={styles.commentsTitle}>COMMENTS ({post.comments.length})</Text>
 
           {post.comments.length === 0 ? (
-            <View style={styles.noComments}>
-              <Text style={styles.noCommentsIcon}>💬</Text>
-              <Text style={styles.noCommentsText}>No comments yet</Text>
-              <Text style={styles.noCommentsSubtext}>Be the first to encourage!</Text>
+            <View style={styles.emptyComments}>
+              <Text style={styles.emptyIcon}>💬</Text>
+              <Text style={styles.emptyTitle}>No comments yet</Text>
+              <Text style={styles.emptyText}>Be the first to encourage!</Text>
             </View>
           ) : (
             post.comments.map((comment: any, index: number) => (
@@ -226,9 +155,7 @@ export const PostDetailScreen = ({ route, navigation }: any) => {
                   </View>
                   <View style={styles.commentMeta}>
                     <Text style={styles.commentUsername}>{comment.username}</Text>
-                    <Text style={styles.commentTimestamp}>
-                      {getTimeAgo(comment.createdAt)}
-                    </Text>
+                    <Text style={styles.commentTime}>{getTimeAgo(comment.createdAt)}</Text>
                   </View>
                 </View>
                 <Text style={styles.commentText}>{comment.text}</Text>
@@ -237,33 +164,29 @@ export const PostDetailScreen = ({ route, navigation }: any) => {
           )}
         </View>
 
-        <View style={styles.bottomSpacer} />
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Add Comment Input */}
-      <View style={styles.commentInputContainer}>
+      {/* Comment Input */}
+      <View style={styles.inputBar}>
         <TextInput
           style={styles.commentInput}
           placeholder="Add a comment..."
-          placeholderTextColor={colors.text.secondary}
+          placeholderTextColor="#2a4a7f"
           value={commentText}
           onChangeText={setCommentText}
           multiline
           maxLength={500}
         />
-        <TouchableOpacity 
-          style={[
-            styles.sendButton,
-            (!commentText.trim() || submitting) && styles.sendButtonDisabled
-          ]}
+        <TouchableOpacity
+          style={[styles.sendBtn, (!commentText.trim() || submitting) && styles.sendBtnDisabled]}
           onPress={handleAddComment}
           disabled={!commentText.trim() || submitting}
         >
-          {submitting ? (
-            <ActivityIndicator size="small" color={colors.text.white} />
-          ) : (
-            <Text style={styles.sendIcon}>➤</Text>
-          )}
+          {submitting
+            ? <ActivityIndicator size="small" color="#fff" />
+            : <Text style={styles.sendIcon}>➤</Text>
+          }
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -271,242 +194,81 @@ export const PostDetailScreen = ({ route, navigation }: any) => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.lightGray
-  },
+  container: { flex: 1, backgroundColor: '#0a1628' },
+
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingTop: 50,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.background.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingTop: 56, paddingBottom: 16, paddingHorizontal: 20,
+    backgroundColor: '#0d1f3c', borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
   },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.accent.blue + '15',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  backIcon: {
-    fontSize: 24,
-    color: colors.accent.blue,
-    fontWeight: 'bold'
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary,
-    flex: 1,
-    textAlign: 'center'
-  },
-  deleteButton: {
-    fontSize: 24,
-    padding: spacing.sm
-  },
-  placeholder: {
-    width: 40
-  },
-  content: {
-    flex: 1
-  },
+  backBtn: { width: 60 },
+  backText: { color: '#4A9EFF', fontSize: 16, fontWeight: '600' },
+  title: { color: '#fff', fontSize: 20, fontWeight: '800', letterSpacing: 2 },
+  deleteBtn: { width: 60, alignItems: 'flex-end' },
+  deleteBtnText: { fontSize: 22 },
+
+  scroll: { flex: 1 },
+  content: { padding: 16 },
+
+  // Post
   postCard: {
-    backgroundColor: colors.background.white,
-    padding: spacing.lg,
-    marginBottom: spacing.sm
+    backgroundColor: '#0d1f3c', borderRadius: 16,
+    padding: 18, marginBottom: 14,
+    borderTopWidth: 3, elevation: 4,
   },
-  postHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm
+  postHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 14 },
+  avatar: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  avatarText: { fontSize: 20, fontWeight: '800' },
+  postMeta: { flex: 1 },
+  username: { color: '#fff', fontSize: 15, fontWeight: '700' },
+  timestamp: { color: '#5a7fa8', fontSize: 12, marginTop: 2 },
+  categoryPill: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, gap: 4 },
+  categoryPillIcon: { fontSize: 13 },
+  categoryPillText: { fontSize: 11, fontWeight: '800', letterSpacing: 0.5 },
+
+  postContent: { color: '#c8d8f0', fontSize: 16, lineHeight: 26, marginBottom: 16 },
+
+  postActions: { flexDirection: 'row', gap: 20, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#1a3a6b' },
+  actionBtn: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  actionIcon: { fontSize: 18 },
+  actionText: { color: '#5a7fa8', fontSize: 13, fontWeight: '600' },
+
+  // Comments
+  commentsCard: {
+    backgroundColor: '#0d1f3c', borderRadius: 16,
+    padding: 18, borderTopWidth: 3, borderTopColor: '#4A9EFF',
   },
-  avatarContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.accent.blue + '30',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md
+  commentsTitle: { color: '#5a7fa8', fontSize: 11, fontWeight: '800', letterSpacing: 2, marginBottom: 16 },
+
+  emptyComments: { alignItems: 'center', paddingVertical: 32 },
+  emptyIcon: { fontSize: 40, marginBottom: 10 },
+  emptyTitle: { color: '#fff', fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  emptyText: { color: '#5a7fa8', fontSize: 13 },
+
+  commentCard: { marginBottom: 16, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#1a3a6b' },
+  commentHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  commentAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: '#26de8130', alignItems: 'center', justifyContent: 'center', marginRight: 10 },
+  commentAvatarText: { fontSize: 14, fontWeight: '800', color: '#26de81' },
+  commentMeta: { flex: 1 },
+  commentUsername: { color: '#fff', fontSize: 14, fontWeight: '700' },
+  commentTime: { color: '#5a7fa8', fontSize: 11, marginTop: 2 },
+  commentText: { color: '#c8d8f0', fontSize: 14, lineHeight: 20, marginLeft: 42 },
+
+  // Input bar
+  inputBar: {
+    flexDirection: 'row', alignItems: 'flex-end',
+    padding: 12, paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+    backgroundColor: '#0d1f3c',
+    borderTopWidth: 1, borderTopColor: '#1a3a6b',
+    gap: 10,
   },
-  avatar: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.accent.blue
-  },
-  postMeta: {
-    flex: 1
-  },
-  username: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text.primary
-  },
-  timestamp: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    marginTop: 2
-  },
-  categoryBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  categoryIcon: {
-    fontSize: 18
-  },
-  categoryLabelContainer: {
-    marginBottom: spacing.sm
-  },
-  categoryLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5
-  },
-  postContent: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: colors.text.primary,
-    marginBottom: spacing.md
-  },
-  postActions: {
-    flexDirection: 'row',
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.background.lightGray,
-    gap: spacing.lg
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center'
-  },
-  actionIcon: {
-    fontSize: 18,
-    marginRight: spacing.xs
-  },
-  actionText: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    fontWeight: '500'
-  },
-  commentsSection: {
-    backgroundColor: colors.background.white,
-    padding: spacing.lg
-  },
-  commentsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.md
-  },
-  noComments: {
-    alignItems: 'center',
-    paddingVertical: spacing.xl * 2
-  },
-  noCommentsIcon: {
-    fontSize: 48,
-    marginBottom: spacing.sm
-  },
-  noCommentsText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: 4
-  },
-  noCommentsSubtext: {
-    fontSize: 14,
-    color: colors.text.secondary
-  },
-  commentCard: {
-    marginBottom: spacing.md,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
-  },
-  commentHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.sm
-  },
-  commentAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.accent.green + '30',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm
-  },
-  commentAvatarText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: colors.accent.green
-  },
-  commentMeta: {
-    flex: 1
-  },
-  commentUsername: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.primary
-  },
-  commentTimestamp: {
-    fontSize: 11,
-    color: colors.text.secondary,
-    marginTop: 2
-  },
-  commentText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.text.primary,
-    marginLeft: 40
-  },
-  bottomSpacer: {
-    height: 100
-  },
-  commentInputContainer: {
-  flexDirection: 'row',
-  padding: spacing.md,
-  paddingBottom: spacing.xl + 10,  // Extra space for Android nav bar
-  backgroundColor: colors.background.white,
-  borderTopWidth: 1,
-  borderTopColor: colors.background.lightGray,
-  alignItems: 'flex-end',
-  // Add minimum height to ensure it's visible
-  minHeight: 70
-},
   commentInput: {
-    flex: 1,
-    backgroundColor: colors.background.lightGray,
-    borderRadius: borderRadius.medium,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: 15,
-    maxHeight: 100,
-    marginRight: spacing.sm
+    flex: 1, backgroundColor: '#0a1628',
+    borderRadius: 20, paddingHorizontal: 16, paddingVertical: 10,
+    fontSize: 15, color: '#fff', maxHeight: 100,
+    borderWidth: 1, borderColor: '#1a3a6b',
   },
-  sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.accent.blue,
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  sendButtonDisabled: {
-    opacity: 0.3
-  },
-  sendIcon: {
-    fontSize: 20,
-    color: colors.text.white
-  }
+  sendBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#4A9EFF', alignItems: 'center', justifyContent: 'center' },
+  sendBtnDisabled: { opacity: 0.3 },
+  sendIcon: { fontSize: 18, color: '#fff' },
 });

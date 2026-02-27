@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { nutritionAPI } from '../services/api';
+import { useDailyQuote } from '../hooks/useDailyQuote';
+
 
 interface FoodItem {
   _id?: string;
@@ -22,6 +24,7 @@ interface Meal {
 
 export const NutritionScreen = ({ navigation }: any) => {
   const { user } = useAuth();
+  const quote = useDailyQuote();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [nutritionData, setNutritionData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -243,22 +246,20 @@ export const NutritionScreen = ({ navigation }: any) => {
         })}
 
         {/* Faith Card */}
-        <View style={styles.faithCard}>
-          <Text style={styles.faithIcon}>🙏</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.faithTitle}>Fuel Your Purpose</Text>
-            <Text style={styles.faithText}>
-              "So whether you eat or drink or whatever you do, do it all for the glory of God."
-            </Text>
-            <Text style={styles.faithRef}>— 1 Corinthians 10:31</Text>
-          </View>
-        </View>
+                <View style={styles.faithCard}>
+                  <Text style={styles.faithIcon}>🙏</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.faithTitle}>Daily Inspiration</Text>
+                    <Text style={styles.faithText}>"{quote.text}"</Text>
+                    <Text style={styles.faithRef}>— {quote.author}</Text>
+                  </View>
+                </View>
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
-    </View>
-  );
-};
+                <View style={{ height: 40 }} />
+              </ScrollView>
+            </View>
+          );
+        };
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a1628' },

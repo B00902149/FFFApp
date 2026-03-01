@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { profileAPI, workoutAPI } from '../services/api';
+import { useFocusEffect } from '@react-navigation/native';
 
 export const ProfileScreen = ({ navigation }: any) => {
   const { user, logout } = useAuth();
@@ -12,6 +13,12 @@ export const ProfileScreen = ({ navigation }: any) => {
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => { loadProfile(); }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+    }, [])
+  );
 
   const loadProfile = async () => {
     if (!user?.id) return;
@@ -88,6 +95,16 @@ export const ProfileScreen = ({ navigation }: any) => {
     return 'Legendary! 🏆';
   };
 
+  // Format measurement key to readable label
+  const formatMeasureKey = (key: string) => {
+    return key
+      .replace(/([A-Z])/g, ' $1')
+      .replace('Left', '(L)')
+      .replace('Right', '(R)')
+      .trim()
+      .replace(/\b\w/g, c => c.toUpperCase());
+  };
+
   if (loading) {
     return (
       <View style={styles.centered}>
@@ -98,6 +115,7 @@ export const ProfileScreen = ({ navigation }: any) => {
   }
 
   const bmi = getBMI();
+  const hasMeasurements = profile?.measurements && Object.keys(profile.measurements).filter(k => profile.measurements[k]).length > 0;
 
   const actionButtons = [
     { icon: '📋', label: 'Workout Templates', screen: 'WorkoutTemplates' },
@@ -108,9 +126,9 @@ export const ProfileScreen = ({ navigation }: any) => {
   ];
 
   const statItems = [
-    { value: stats?.workoutCount || 0,   label: 'Workouts',   color: '#FFFFFF'},
-    { value: stats?.postCount || 0,      label: 'Posts',      color: '#FFFFFF' },
-    { value: stats?.nutritionDays || 0,  label: 'Days Logged',color: '#FFFFFF'},
+    { value: stats?.workoutCount || 0,   label: 'Workouts',    color: '#FFFFFF' },
+    { value: stats?.postCount || 0,      label: 'Posts',       color: '#FFFFFF' },
+    { value: stats?.nutritionDays || 0,  label: 'Days Logged', color: '#FFFFFF' },
     { value: stats?.daysActive || 0,     label: 'Days Active', color: '#FFFFFF' },
   ];
 
@@ -140,9 +158,8 @@ export const ProfileScreen = ({ navigation }: any) => {
           <Text style={styles.profileName}>{profile?.username}</Text>
           <Text style={styles.profileEmail}>{profile?.email}</Text>
           {profile?.bio && <Text style={styles.bio}>{profile.bio}</Text>}
-
           <View style={styles.profileActions}>
-            <TouchableOpacity style={styles.editButton} onPress={() => navigation.navigate('EditProfile', { profile, onUpdate: setProfile })}>
+            <TouchableOpacity style={styles.editButton} onPress={() => navigation.navigate('EditProfile', { profile })}>
               <Text style={styles.editButtonText}>✎  Edit Profile</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
@@ -189,6 +206,8 @@ export const ProfileScreen = ({ navigation }: any) => {
         {/* Body Metrics */}
         <View style={styles.metricsCard}>
           <Text style={styles.sectionTitle}>BODY METRICS</Text>
+
+          {/* Weight / Height / BMI */}
           <View style={styles.metricsGrid}>
             {profile?.currentWeight && (
               <View style={[styles.metricItem, { borderTopColor: '#4A9EFF' }]}>
@@ -219,9 +238,38 @@ export const ProfileScreen = ({ navigation }: any) => {
               </View>
             )}
           </View>
+
           {(!profile?.currentWeight && !profile?.targetWeight && !profile?.height) && (
-            <TouchableOpacity style={styles.addMetricsBtn} onPress={() => navigation.navigate('EditProfile', { profile, onUpdate: setProfile })}>
+            <TouchableOpacity style={styles.addMetricsBtn} onPress={() => navigation.navigate('EditProfile', { profile })}>
               <Text style={styles.addMetricsBtnText}>+ Add Body Metrics</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* Body Measurements */}
+          {hasMeasurements && (
+            <>
+              <View style={styles.measureDivider} />
+              <Text style={styles.measureHeading}>BODY MEASUREMENTS</Text>
+              <View style={styles.measureGrid}>
+                {Object.entries(profile.measurements)
+                  .filter(([_, v]) => v)
+                  .map(([key, value]) => (
+                    <View key={key} style={styles.measureItem}>
+                      <Text style={styles.measureValue}>{value as string}</Text>
+                      <Text style={styles.measureUnit}>{profile.measureUnit || 'cm'}</Text>
+                      <Text style={styles.measureLabel}>{formatMeasureKey(key)}</Text>
+                    </View>
+                  ))}
+              </View>
+            </>
+          )}
+
+          {!hasMeasurements && (
+            <TouchableOpacity
+              style={[styles.addMetricsBtn, { marginTop: 10 }]}
+              onPress={() => navigation.navigate('EditProfile', { profile })}
+            >
+              <Text style={styles.addMetricsBtnText}>+ Add Body Measurements</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -265,23 +313,15 @@ const styles = StyleSheet.create({
   loadingText: { color: '#8ab4f8', marginTop: 12 },
   content: { padding: 16, paddingBottom: 40 },
 
-  // Profile Header
   profileCard: {
-    backgroundColor: '#0d1f3c',
-    borderRadius: 16,
-    padding: 24,
-    alignItems: 'center',
-    marginBottom: 14,
-    borderTopWidth: 3,
-    borderTopColor: '#4A9EFF',
-    elevation: 4,
+    backgroundColor: '#0d1f3c', borderRadius: 16, padding: 24,
+    alignItems: 'center', marginBottom: 14,
+    borderTopWidth: 3, borderTopColor: '#4A9EFF', elevation: 4,
   },
   avatarContainer: {
     width: 100, height: 100, borderRadius: 50,
-    backgroundColor: '#1a3a6b',
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: 12, overflow: 'hidden',
-    borderWidth: 3, borderColor: '#4A9EFF',
+    backgroundColor: '#1a3a6b', alignItems: 'center', justifyContent: 'center',
+    marginBottom: 12, overflow: 'hidden', borderWidth: 3, borderColor: '#4A9EFF',
   },
   avatar: { width: '100%', height: '100%', borderRadius: 50 },
   avatarText: { fontSize: 48 },
@@ -294,12 +334,10 @@ const styles = StyleSheet.create({
   logoutButton: { backgroundColor: '#1a3a6b', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
   logoutButtonText: { color: '#FF6B6B', fontWeight: '700', fontSize: 14 },
 
-  // Streak
   streakCard: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#0d1f3c', borderRadius: 16,
-    padding: 18, marginBottom: 14,
-    borderTopWidth: 3, elevation: 4,
+    padding: 18, marginBottom: 14, borderTopWidth: 3, elevation: 4,
   },
   streakIcon: { fontSize: 36, marginRight: 14 },
   streakContent: { flex: 1 },
@@ -308,20 +346,14 @@ const styles = StyleSheet.create({
   streakBadge: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   streakBadgeText: { color: '#ffffff', fontSize: 11, fontWeight: '700' },
 
-  // Stats
-  statsGrid: {
-    flexDirection: 'row', flexWrap: 'wrap',
-    justifyContent: 'space-between', marginBottom: 14,
-  },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 14 },
   statCard: {
     width: '48%', backgroundColor: '#0d1f3c',
-    borderRadius: 16, padding: 18, alignItems: 'center',
-    marginBottom: 12, elevation: 4,
+    borderRadius: 16, padding: 18, alignItems: 'center', marginBottom: 12, elevation: 4,
   },
   statValue: { fontSize: 28, fontWeight: '800', marginBottom: 4 },
   statLabel: { color: '#4A9EFF', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
 
-  // Goal
   goalCard: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#0d1f3c', borderRadius: 16,
@@ -331,7 +363,6 @@ const styles = StyleSheet.create({
   goalIcon: { fontSize: 32, marginRight: 14 },
   goalText: { color: '#fff', fontSize: 15, fontWeight: '600', marginTop: 4 },
 
-  // Metrics
   metricsCard: {
     backgroundColor: '#0d1f3c', borderRadius: 16,
     padding: 18, marginBottom: 14,
@@ -340,8 +371,7 @@ const styles = StyleSheet.create({
   metricsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14 },
   metricItem: {
     width: '47%', backgroundColor: '#0a1628',
-    borderRadius: 12, padding: 14, alignItems: 'center',
-    borderTopWidth: 2,
+    borderRadius: 12, padding: 14, alignItems: 'center', borderTopWidth: 2,
   },
   metricValue: { color: '#fff', fontSize: 22, fontWeight: '800' },
   metricUnit: { color: '#5a7fa8', fontSize: 11, marginTop: 2, fontWeight: '600' },
@@ -352,7 +382,22 @@ const styles = StyleSheet.create({
   },
   addMetricsBtnText: { color: '#4A9EFF', fontWeight: '700', fontSize: 14 },
 
-  // Member
+  // Body Measurements
+  measureDivider: { height: 1, backgroundColor: '#1a3a6b', marginVertical: 16 },
+  measureHeading: {
+    color: '#5a7fa8', fontSize: 11, fontWeight: '800',
+    letterSpacing: 2, marginBottom: 12,
+  },
+  measureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  measureItem: {
+    width: '47%', backgroundColor: '#0a1628',
+    borderRadius: 12, padding: 12, alignItems: 'center',
+    borderTopWidth: 2, borderTopColor: '#26de81',
+  },
+  measureValue: { color: '#fff', fontSize: 18, fontWeight: '800' },
+  measureUnit: { color: '#5a7fa8', fontSize: 10, marginTop: 2, fontWeight: '600' },
+  measureLabel: { color: '#26de81', fontSize: 10, marginTop: 4, letterSpacing: 0.5, fontWeight: '700', textAlign: 'center' },
+
   memberCard: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#0d1f3c', borderRadius: 16,
@@ -362,7 +407,6 @@ const styles = StyleSheet.create({
   memberIcon: { fontSize: 32, marginRight: 14 },
   memberText: { color: '#fff', fontSize: 16, fontWeight: '700', marginTop: 4 },
 
-  // Actions
   actionsCard: {
     backgroundColor: '#0d1f3c', borderRadius: 16,
     padding: 18, marginBottom: 14,
@@ -370,14 +414,12 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 14,
-    borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
+    paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
   },
   actionIcon: { fontSize: 22, marginRight: 14, width: 30 },
   actionLabel: { flex: 1, color: '#fff', fontSize: 15, fontWeight: '600' },
   actionArrow: { fontSize: 28, color: '#4A9EFF' },
 
-  // Shared
   sectionTitle: { color: '#fff', fontSize: 12, fontWeight: '800', letterSpacing: 2, marginBottom: 4 },
   sectionLabel: { color: '#5a7fa8', fontSize: 11, fontWeight: '700', letterSpacing: 1.5, marginBottom: 4 },
 });

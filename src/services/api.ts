@@ -15,12 +15,10 @@ const api = axios.create({
 // Auth API calls
 export const authAPI = {
   // Register new user
-  register: async (email: string, username: string, password: string) => {
+  register: async (email: string, username: string, password: string, firstName: string, surname: string, country: string, mobile: string = '') => {
     try {
       const response = await api.post('/auth/register', {
-        email,
-        username,
-        password
+        email, username, password, firstName, surname, country, mobile
       });
       return response.data;
     } catch (error: any) {
@@ -28,19 +26,37 @@ export const authAPI = {
     }
   },
 
-  // Login user
-  login: async (email: string, password: string) => {
-    try {
-      const response = await api.post('/auth/login', {
-        email,
-        password
-      });
-      return response.data;
-    } catch (error: any) {
-      throw error.response?.data || { error: 'Network error' };
-    }
-  }
-};
+    // Login user
+    login: async (email: string, password: string) => {
+      try {
+        const response = await api.post('/auth/login', {
+          email,
+          password
+        });
+        return response.data;
+      } catch (error: any) {
+        throw error.response?.data || { error: 'Network error' };
+      }
+    },
+
+    // Forgot password
+    forgotPassword: async (email: string) => {
+      try {
+        const response = await api.post('/auth/forgot-password', { email });
+        return response.data;
+      } catch (error: any) {
+        throw error.response?.data || { error: 'Network error' };
+      }
+    },
+    changePassword: async (userId: string, currentPassword: string, newPassword: string) => {
+      try {
+        const response = await api.post('/auth/change-password', { userId, currentPassword, newPassword });
+        return response.data;
+      } catch (error: any) {
+        throw error.response?.data || { error: 'Network error' };
+      }
+    },
+  };
 
 // Bible verse API
 export const verseAPI = {
@@ -83,9 +99,9 @@ export const workoutAPI = {
   createWorkout: async (workout: any) => {
     try {
       console.log('📤 Sending workout to API:', JSON.stringify(workout, null, 2));
-      
+
       const response = await api.post('/workouts', workout);
-      
+
       console.log('✅ Workout created response:', response.data);
       return response.data;
     } catch (error: any) {

@@ -112,8 +112,8 @@ export const DashboardScreen = ({ navigation }: any) => {
         >
           <Text style={styles.progressIcon}>📈</Text>
           <View style={styles.progressContent}>
-            <Text style={styles.progressTitle}>View Progress Charts</Text>
-            <Text style={styles.progressSubtitle}>Track your weight, calories & more</Text>
+            <Text style={styles.progressTitle}>My Progress</Text>
+            <Text style={styles.progressSubtitle}>View your weight progress, stats & more</Text>
           </View>
           <Text style={styles.progressArrow}>›</Text>
         </TouchableOpacity>

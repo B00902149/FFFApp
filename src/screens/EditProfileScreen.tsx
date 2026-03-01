@@ -1,15 +1,56 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import {
+  View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity,
+  Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Image, Modal
+} from 'react-native';
 import { colors, spacing, borderRadius } from '../theme/colors';
-import { profileAPI, uploadAPI } from '../services/api';
+import { profileAPI, uploadAPI, authAPI } from '../services/api';
 import { pickImage, convertImageToBase64 } from '../utils/imagePicker';
 
 const AVATARS = ['👤', '😊', '💪', '🔥', '⚡', '🙏', '✨', '🎯', '🏃', '🏋️', '🤸', '🧘'];
 const FITNESS_GOALS = ['Weight Loss', 'Muscle Gain', 'Maintenance', 'General Fitness', 'Athletic Performance'];
 
-export const EditProfileScreen = ({ route, navigation }: any) => {
-  const { profile, onUpdate } = route.params || {};
+const MALE_MEASUREMENTS = [
+  { key: 'chest',       label: 'Chest',        icon: '📏' },
+  { key: 'shoulders',   label: 'Shoulders',    icon: '📏' },
+  { key: 'waist',       label: 'Waist',        icon: '📏' },
+  { key: 'hips',        label: 'Hips',         icon: '📏' },
+  { key: 'bicepLeft',   label: 'Bicep (L)',    icon: '💪' },
+  { key: 'bicepRight',  label: 'Bicep (R)',    icon: '💪' },
+  { key: 'thighLeft',   label: 'Thigh (L)',    icon: '📏' },
+  { key: 'thighRight',  label: 'Thigh (R)',    icon: '📏' },
+  { key: 'calfLeft',    label: 'Calf (L)',     icon: '📏' },
+  { key: 'calfRight',   label: 'Calf (R)',     icon: '📏' },
+  { key: 'neck',        label: 'Neck',         icon: '📏' },
+  { key: 'forearm',     label: 'Forearm',      icon: '💪' },
+];
 
+const FEMALE_MEASUREMENTS = [
+  { key: 'bust',        label: 'Bust',         icon: '📏' },
+  { key: 'underBust',   label: 'Under Bust',   icon: '📏' },
+  { key: 'waist',       label: 'Waist',        icon: '📏' },
+  { key: 'hips',        label: 'Hips',         icon: '📏' },
+  { key: 'thighLeft',   label: 'Thigh (L)',    icon: '📏' },
+  { key: 'thighRight',  label: 'Thigh (R)',    icon: '📏' },
+  { key: 'calfLeft',    label: 'Calf (L)',     icon: '📏' },
+  { key: 'calfRight',   label: 'Calf (R)',     icon: '📏' },
+  { key: 'bicepLeft',   label: 'Bicep (L)',    icon: '💪' },
+  { key: 'bicepRight',  label: 'Bicep (R)',    icon: '💪' },
+  { key: 'neck',        label: 'Neck',         icon: '📏' },
+  { key: 'shoulders',   label: 'Shoulders',    icon: '📏' },
+];
+
+const PASSWORD_RULES = [
+  { label: 'At least 9 characters',          test: (p: string) => p.length >= 9 },
+  { label: 'One uppercase letter',            test: (p: string) => /[A-Z]/.test(p) },
+  { label: 'One number',                      test: (p: string) => /[0-9]/.test(p) },
+  { label: 'One special character',           test: (p: string) => /[^A-Za-z0-9]/.test(p) },
+];
+
+export const EditProfileScreen = ({ route, navigation }: any) => {
+  const { profile } = route.params || {};
+
+  // Profile fields
   const [avatar, setAvatar] = useState(profile?.avatar || '👤');
   const [profilePicture, setProfilePicture] = useState(profile?.profilePicture || null);
   const [bio, setBio] = useState(profile?.bio || '');
@@ -22,31 +63,41 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
   const [loading, setLoading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
+  // Body measurements
+  const [gender, setGender] = useState<'male' | 'female'>(profile?.gender || 'male');
+  const [measureUnit, setMeasureUnit] = useState<'cm' | 'inches'>('cm');
+  const [measurements, setMeasurements] = useState<Record<string, string>>(
+    profile?.measurements || {}
+  );
+
+  // Change password modal
+  const [passwordVisible, setPasswordVisible] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+
+  const activeMeasurements = gender === 'male' ? MALE_MEASUREMENTS : FEMALE_MEASUREMENTS;
+
+  // ── Image Handlers ────────────────────────────────────────────────────────
   const handlePickImage = async (fromCamera: boolean) => {
     try {
       const uri = await pickImage(fromCamera);
-      
       if (uri) {
         setUploadingPhoto(true);
-        
-        // Convert to base64
         const base64 = await convertImageToBase64(uri);
-        
         if (base64) {
-          // Upload to backend
           const updatedUser = await uploadAPI.uploadProfilePicture(profile._id, base64);
-          
           setProfilePicture(base64);
           Alert.alert('Success', 'Profile picture uploaded!');
-          
-          // Update parent
-          if (onUpdate) {
-            onUpdate(updatedUser);
-          }
+
         }
       }
     } catch (error) {
-      console.error('Pick image error:', error);
       Alert.alert('Error', 'Failed to upload image');
     } finally {
       setUploadingPhoto(false);
@@ -54,99 +105,84 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
   };
 
   const handleRemovePhoto = async () => {
-    Alert.alert(
-      'Remove Photo',
-      'Are you sure you want to remove your profile picture?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Remove',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setUploadingPhoto(true);
-              const updatedUser = await uploadAPI.removeProfilePicture(profile._id);
-              
-              setProfilePicture(null);
-              Alert.alert('Success', 'Profile picture removed');
-              
-              if (onUpdate) {
-                onUpdate(updatedUser);
-              }
-            } catch (error) {
-              console.error('Remove photo error:', error);
-              Alert.alert('Error', 'Failed to remove photo');
-            } finally {
-              setUploadingPhoto(false);
-            }
+    Alert.alert('Remove Photo', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Remove', style: 'destructive',
+        onPress: async () => {
+          try {
+            setUploadingPhoto(true);
+            const updatedUser = await uploadAPI.removeProfilePicture(profile._id);
+            setProfilePicture(null);
+
+          } catch {
+            Alert.alert('Error', 'Failed to remove photo');
+          } finally {
+            setUploadingPhoto(false);
           }
         }
-      ]
-    );
+      }
+    ]);
   };
 
   const showImageOptions = () => {
-    Alert.alert(
-      'Profile Picture',
-      'Choose an option',
-      [
-        {
-          text: 'Take Photo',
-          onPress: () => handlePickImage(true)
-        },
-        {
-          text: 'Choose from Gallery',
-          onPress: () => handlePickImage(false)
-        },
-        ...(profilePicture ? [{
-          text: 'Remove Photo',
-          style: 'destructive' as const,
-          onPress: handleRemovePhoto
-        }] : []),
-        {
-          text: 'Cancel',
-          style: 'cancel' as const
-        }
-      ]
-    );
+    Alert.alert('Profile Picture', 'Choose an option', [
+      { text: 'Take Photo', onPress: () => handlePickImage(true) },
+      { text: 'Choose from Gallery', onPress: () => handlePickImage(false) },
+      ...(profilePicture ? [{ text: 'Remove Photo', style: 'destructive' as const, onPress: handleRemovePhoto }] : []),
+      { text: 'Cancel', style: 'cancel' as const }
+    ]);
   };
 
+  // ── Save Profile ──────────────────────────────────────────────────────────
   const handleSave = async () => {
     setLoading(true);
     try {
       const updates = {
-        avatar,
-        bio: bio.trim(),
-        fitnessGoal,
+        avatar, bio: bio.trim(), fitnessGoal,
         currentWeight: currentWeight ? parseFloat(currentWeight) : null,
         targetWeight: targetWeight ? parseFloat(targetWeight) : null,
         height: height ? parseFloat(height) : null,
-        weightUnit,
-        heightUnit
+        weightUnit, heightUnit,
+        gender,
+        measurements,
+        measureUnit,
       };
-
       const updatedProfile = await profileAPI.updateProfile(profile._id, updates);
-      
-      Alert.alert('Success', 'Profile updated successfully!');
-      
-      if (onUpdate) {
-        onUpdate(updatedProfile);
-      }
-      
+      Alert.alert('Success', 'Profile updated!');
+
       navigation.goBack();
-    } catch (error) {
-      console.error('Failed to update profile:', error);
+    } catch {
       Alert.alert('Error', 'Failed to update profile');
     } finally {
       setLoading(false);
     }
   };
 
+  // ── Change Password ───────────────────────────────────────────────────────
+  const handleChangePassword = async () => {
+    setPasswordError('');
+    if (!currentPassword) { setPasswordError('Please enter your current password.'); return; }
+    if (!PASSWORD_RULES.every(r => r.test(newPassword))) { setPasswordError('New password does not meet requirements.'); return; }
+    if (newPassword !== confirmPassword) { setPasswordError('Passwords do not match.'); return; }
+
+    setPasswordLoading(true);
+    try {
+      await authAPI.changePassword(profile._id, currentPassword, newPassword);
+      Alert.alert('Success', 'Password updated successfully!');
+      setPasswordVisible(false);
+      setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+    } catch (err: any) {
+      setPasswordError(err?.error || 'Failed to update password.');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <KeyboardAvoidingView 
-      style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -154,60 +190,38 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Profile</Text>
         <TouchableOpacity onPress={handleSave} disabled={loading}>
-          <Text style={[styles.saveButton, loading && styles.saveButtonDisabled]}>
+          <Text style={[styles.saveButton, loading && { opacity: 0.4 }]}>
             {loading ? 'Saving...' : 'Save'}
           </Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content} keyboardShouldPersistTaps="handled">
-        {/* Profile Picture Section */}
+      <ScrollView style={styles.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+
+        {/* ── Profile Picture ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Profile Picture</Text>
-          
+          <Text style={styles.sectionTitle}>PROFILE PICTURE</Text>
           <View style={styles.photoContainer}>
-            <TouchableOpacity 
-              style={styles.photoCircle}
-              onPress={showImageOptions}
-              disabled={uploadingPhoto}
-            >
+            <TouchableOpacity style={styles.photoCircle} onPress={showImageOptions} disabled={uploadingPhoto}>
               {uploadingPhoto ? (
-                <ActivityIndicator size="large" color={colors.accent.blue} />
+                <ActivityIndicator size="large" color="#4A9EFF" />
               ) : profilePicture ? (
-                <Image 
-                  source={{ uri: profilePicture }}
-                  style={styles.profileImage}
-                />
+                <Image source={{ uri: profilePicture }} style={styles.profileImage} />
               ) : (
-                <Text style={styles.photoPlaceholder}>📷</Text>
+                <Text style={styles.photoPlaceholder}>{avatar}</Text>
               )}
             </TouchableOpacity>
-            
             <View style={styles.photoButtons}>
-              <TouchableOpacity 
-                style={styles.photoButton}
-                onPress={() => handlePickImage(true)}
-                disabled={uploadingPhoto}
-              >
+              <TouchableOpacity style={styles.photoButton} onPress={() => handlePickImage(true)} disabled={uploadingPhoto}>
                 <Text style={styles.photoButtonIcon}>📷</Text>
                 <Text style={styles.photoButtonText}>Camera</Text>
               </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.photoButton}
-                onPress={() => handlePickImage(false)}
-                disabled={uploadingPhoto}
-              >
+              <TouchableOpacity style={styles.photoButton} onPress={() => handlePickImage(false)} disabled={uploadingPhoto}>
                 <Text style={styles.photoButtonIcon}>🖼️</Text>
                 <Text style={styles.photoButtonText}>Gallery</Text>
               </TouchableOpacity>
-              
               {profilePicture && (
-                <TouchableOpacity 
-                  style={[styles.photoButton, styles.removeButton]}
-                  onPress={handleRemovePhoto}
-                  disabled={uploadingPhoto}
-                >
+                <TouchableOpacity style={[styles.photoButton, styles.removeButton]} onPress={handleRemovePhoto} disabled={uploadingPhoto}>
                   <Text style={styles.photoButtonIcon}>🗑️</Text>
                   <Text style={styles.photoButtonText}>Remove</Text>
                 </TouchableOpacity>
@@ -216,18 +230,15 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
-        {/* Avatar Selection (Emoji fallback) */}
+        {/* ── Avatar Emoji ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Choose Avatar Emoji</Text>
-          <Text style={styles.sectionSubtitle}>Used when no profile picture is set</Text>
+          <Text style={styles.sectionTitle}>AVATAR EMOJI</Text>
+          <Text style={styles.sectionSubtitle}>Shown when no photo is set</Text>
           <View style={styles.avatarsGrid}>
-            {AVATARS.map((item) => (
+            {AVATARS.map(item => (
               <TouchableOpacity
                 key={item}
-                style={[
-                  styles.avatarOption,
-                  avatar === item && styles.avatarOptionSelected
-                ]}
+                style={[styles.avatarOption, avatar === item && styles.avatarOptionSelected]}
                 onPress={() => setAvatar(item)}
               >
                 <Text style={styles.avatarOptionText}>{item}</Text>
@@ -236,13 +247,13 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
-        {/* Bio */}
+        {/* ── Bio ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Bio / Testimony</Text>
+          <Text style={styles.sectionTitle}>BIO / TESTIMONY</Text>
           <TextInput
             style={styles.textArea}
-            placeholder="Share a bit about your fitness journey and faith..."
-            placeholderTextColor={colors.text.secondary}
+            placeholder="Share your fitness journey and faith..."
+            placeholderTextColor="#5a7fa8"
             value={bio}
             onChangeText={setBio}
             multiline
@@ -252,23 +263,17 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
           <Text style={styles.characterCount}>{bio.length}/500</Text>
         </View>
 
-        {/* Fitness Goal */}
+        {/* ── Fitness Goal ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Fitness Goal</Text>
+          <Text style={styles.sectionTitle}>FITNESS GOAL</Text>
           <View style={styles.goalsGrid}>
-            {FITNESS_GOALS.map((goal) => (
+            {FITNESS_GOALS.map(goal => (
               <TouchableOpacity
                 key={goal}
-                style={[
-                  styles.goalOption,
-                  fitnessGoal === goal && styles.goalOptionSelected
-                ]}
+                style={[styles.goalOption, fitnessGoal === goal && styles.goalOptionSelected]}
                 onPress={() => setFitnessGoal(goal)}
               >
-                <Text style={[
-                  styles.goalOptionText,
-                  fitnessGoal === goal && styles.goalOptionTextSelected
-                ]}>
+                <Text style={[styles.goalOptionText, fitnessGoal === goal && styles.goalOptionTextSelected]}>
                   {goal}
                 </Text>
               </TouchableOpacity>
@@ -276,306 +281,373 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
-        {/* Weight */}
+        {/* ── Weight ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Weight</Text>
-          
+          <Text style={styles.sectionTitle}>WEIGHT</Text>
           <View style={styles.unitToggle}>
-            <TouchableOpacity
-              style={[styles.unitButton, weightUnit === 'kg' && styles.unitButtonActive]}
-              onPress={() => setWeightUnit('kg')}
-            >
-              <Text style={[styles.unitButtonText, weightUnit === 'kg' && styles.unitButtonTextActive]}>
-                kg
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.unitButton, weightUnit === 'lbs' && styles.unitButtonActive]}
-              onPress={() => setWeightUnit('lbs')}
-            >
-              <Text style={[styles.unitButtonText, weightUnit === 'lbs' && styles.unitButtonTextActive]}>
-                lbs
-              </Text>
-            </TouchableOpacity>
+            {['kg', 'lbs'].map(u => (
+              <TouchableOpacity key={u} style={[styles.unitButton, weightUnit === u && styles.unitButtonActive]} onPress={() => setWeightUnit(u)}>
+                <Text style={[styles.unitButtonText, weightUnit === u && styles.unitButtonTextActive]}>{u}</Text>
+              </TouchableOpacity>
+            ))}
           </View>
-
           <View style={styles.inputRow}>
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Current Weight</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="0"
-                value={currentWeight}
-                onChangeText={setCurrentWeight}
-                keyboardType="decimal-pad"
-              />
+              <Text style={styles.inputLabel}>Current</Text>
+              <TextInput style={styles.input} placeholder="0" placeholderTextColor="#5a7fa8" value={currentWeight} onChangeText={setCurrentWeight} keyboardType="decimal-pad" />
             </View>
-            
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Target Weight</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="0"
-                value={targetWeight}
-                onChangeText={setTargetWeight}
-                keyboardType="decimal-pad"
-              />
+              <Text style={styles.inputLabel}>Target</Text>
+              <TextInput style={styles.input} placeholder="0" placeholderTextColor="#5a7fa8" value={targetWeight} onChangeText={setTargetWeight} keyboardType="decimal-pad" />
             </View>
           </View>
         </View>
 
-        {/* Height */}
+        {/* ── Height ── */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Height</Text>
-          
+          <Text style={styles.sectionTitle}>HEIGHT</Text>
           <View style={styles.unitToggle}>
-            <TouchableOpacity
-              style={[styles.unitButton, heightUnit === 'cm' && styles.unitButtonActive]}
-              onPress={() => setHeightUnit('cm')}
-            >
-              <Text style={[styles.unitButtonText, heightUnit === 'cm' && styles.unitButtonTextActive]}>
-                cm
-              </Text>
+            {['cm', 'inches'].map(u => (
+              <TouchableOpacity key={u} style={[styles.unitButton, heightUnit === u && styles.unitButtonActive]} onPress={() => setHeightUnit(u)}>
+                <Text style={[styles.unitButtonText, heightUnit === u && styles.unitButtonTextActive]}>{u}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TextInput style={styles.input} placeholder="0" placeholderTextColor="#5a7fa8" value={height} onChangeText={setHeight} keyboardType="decimal-pad" />
+        </View>
+
+        {/* ── Body Measurements ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>BODY MEASUREMENTS</Text>
+
+          {/* Gender toggle */}
+          <View style={styles.genderToggle}>
+            <TouchableOpacity style={[styles.genderButton, gender === 'male' && styles.genderButtonActive]} onPress={() => setGender('male')}>
+              <Text style={[styles.genderButtonText, gender === 'male' && styles.genderButtonTextActive]}>♂ Male</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.unitButton, heightUnit === 'inches' && styles.unitButtonActive]}
-              onPress={() => setHeightUnit('inches')}
-            >
-              <Text style={[styles.unitButtonText, heightUnit === 'inches' && styles.unitButtonTextActive]}>
-                inches
-              </Text>
+            <TouchableOpacity style={[styles.genderButton, gender === 'female' && styles.genderButtonActive]} onPress={() => setGender('female')}>
+              <Text style={[styles.genderButtonText, gender === 'female' && styles.genderButtonTextActive]}>♀ Female</Text>
             </TouchableOpacity>
           </View>
 
-          <TextInput
-            style={styles.input}
-            placeholder="0"
-            value={height}
-            onChangeText={setHeight}
-            keyboardType="decimal-pad"
-          />
+          {/* Measurement unit */}
+          <View style={[styles.unitToggle, { marginBottom: spacing.lg }]}>
+            {['cm', 'inches'].map(u => (
+              <TouchableOpacity key={u} style={[styles.unitButton, measureUnit === u && styles.unitButtonActive]} onPress={() => setMeasureUnit(u as 'cm' | 'inches')}>
+                <Text style={[styles.unitButtonText, measureUnit === u && styles.unitButtonTextActive]}>{u}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Measurement fields — 2 columns */}
+          <View style={styles.measureGrid}>
+            {activeMeasurements.map(m => (
+              <View key={m.key} style={styles.measureField}>
+                <Text style={styles.measureLabel}>{m.icon} {m.label}</Text>
+                <View style={styles.measureInputRow}>
+                  <TextInput
+                    style={styles.measureInput}
+                    placeholder="0"
+                    placeholderTextColor="#2a4a7f"
+                    value={measurements[m.key] || ''}
+                    onChangeText={v => setMeasurements(prev => ({ ...prev, [m.key]: v }))}
+                    keyboardType="decimal-pad"
+                  />
+                  <Text style={styles.measureUnit}>{measureUnit}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
         </View>
 
-        <View style={styles.bottomSpacer} />
+        {/* ── Change Password ── */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>SECURITY</Text>
+          <TouchableOpacity style={styles.securityRow} onPress={() => setPasswordVisible(true)}>
+            <Text style={styles.securityIcon}>🔒</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.securityRowText}>Change Password</Text>
+              <Text style={styles.securityRowSub}>Update your account password</Text>
+            </View>
+            <Text style={styles.securityChevron}>›</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={{ height: 100 }} />
       </ScrollView>
 
       {loading && (
         <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color={colors.accent.blue} />
+          <ActivityIndicator size="large" color="#4A9EFF" />
         </View>
       )}
+
+      {/* ── Change Password Modal ── */}
+      <Modal visible={passwordVisible} transparent animationType="slide" onRequestClose={() => setPasswordVisible(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setPasswordVisible(false)}>
+          <TouchableOpacity style={styles.modalSheet} activeOpacity={1}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>CHANGE PASSWORD</Text>
+
+            {/* Current password */}
+            <Text style={styles.pwLabel}>Current Password</Text>
+            <View style={styles.pwRow}>
+              <TextInput
+                style={styles.pwInput}
+                placeholder="Enter current password"
+                placeholderTextColor="#5a7fa8"
+                value={currentPassword}
+                onChangeText={v => { setCurrentPassword(v); setPasswordError(''); }}
+                secureTextEntry={!showCurrentPw}
+              />
+              <TouchableOpacity onPress={() => setShowCurrentPw(!showCurrentPw)} style={styles.eyeBtn}>
+                <Text>{showCurrentPw ? '🙈' : '👁️'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* New password */}
+            <Text style={styles.pwLabel}>New Password</Text>
+            <View style={styles.pwRow}>
+              <TextInput
+                style={styles.pwInput}
+                placeholder="Enter new password"
+                placeholderTextColor="#5a7fa8"
+                value={newPassword}
+                onChangeText={v => { setNewPassword(v); setPasswordError(''); }}
+                secureTextEntry={!showNewPw}
+              />
+              <TouchableOpacity onPress={() => setShowNewPw(!showNewPw)} style={styles.eyeBtn}>
+                <Text>{showNewPw ? '🙈' : '👁️'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Rules */}
+            {newPassword.length > 0 && (
+              <View style={styles.rulesCard}>
+                {PASSWORD_RULES.map((rule, i) => {
+                  const passed = rule.test(newPassword);
+                  return (
+                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                      <Text style={{ color: passed ? '#26de81' : '#2a4a7f', marginRight: 8, fontWeight: '800' }}>{passed ? '✓' : '○'}</Text>
+                      <Text style={{ color: passed ? '#26de81' : '#5a7fa8', fontSize: 12 }}>{rule.label}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+
+            {/* Confirm password */}
+            <Text style={styles.pwLabel}>Confirm New Password</Text>
+            <View style={styles.pwRow}>
+              <TextInput
+                style={styles.pwInput}
+                placeholder="Confirm new password"
+                placeholderTextColor="#5a7fa8"
+                value={confirmPassword}
+                onChangeText={v => { setConfirmPassword(v); setPasswordError(''); }}
+                secureTextEntry={!showConfirmPw}
+              />
+              <TouchableOpacity onPress={() => setShowConfirmPw(!showConfirmPw)} style={styles.eyeBtn}>
+                <Text>{showConfirmPw ? '🙈' : '👁️'}</Text>
+              </TouchableOpacity>
+            </View>
+
+            {!!passwordError && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>⚠️ {passwordError}</Text>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={[styles.pwSaveButton, passwordLoading && { opacity: 0.5 }]}
+              onPress={handleChangePassword}
+              disabled={passwordLoading}
+            >
+              {passwordLoading
+                ? <ActivityIndicator color="#fff" />
+                : <Text style={styles.pwSaveButtonText}>Update Password</Text>
+              }
+            </TouchableOpacity>
+
+            <TouchableOpacity style={{ marginTop: 12 }} onPress={() => setPasswordVisible(false)}>
+              <Text style={{ color: '#5a7fa8', textAlign: 'center', fontSize: 14 }}>Cancel</Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background.white
-  },
+  container: { flex: 1, backgroundColor: '#0a1628' },
+
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingTop: 50,
-    paddingBottom: spacing.md,
-    backgroundColor: colors.background.white,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg, paddingTop: 50, paddingBottom: spacing.md,
+    backgroundColor: '#0d1f3c',
+    borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
   },
-  cancelButton: {
-    fontSize: 16,
-    color: colors.text.secondary
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: colors.text.primary
-  },
-  saveButton: {
-    fontSize: 16,
-    color: colors.accent.blue,
-    fontWeight: '600'
-  },
-  saveButtonDisabled: {
-    opacity: 0.3
-  },
-  content: {
-    flex: 1
-  },
+  cancelButton: { fontSize: 16, color: '#8ab4f8' },
+  headerTitle: { fontSize: 18, fontWeight: 'bold', color: '#fff' },
+  saveButton: { fontSize: 16, color: '#4A9EFF', fontWeight: '700' },
+
+  content: { flex: 1 },
+
   section: {
     padding: spacing.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.background.lightGray
+    borderBottomWidth: 1, borderBottomColor: '#0d1f3c',
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: colors.text.primary,
-    marginBottom: spacing.sm
+    fontSize: 11, fontWeight: '800', letterSpacing: 2,
+    color: '#5a7fa8', marginBottom: spacing.md,
   },
-  sectionSubtitle: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    marginBottom: spacing.md
-  },
-  photoContainer: {
-    alignItems: 'center'
-  },
+  sectionSubtitle: { fontSize: 13, color: '#5a7fa8', marginBottom: spacing.md },
+
+  // Photo
+  photoContainer: { alignItems: 'center' },
   photoCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: colors.background.lightGray,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.lg,
-    borderWidth: 3,
-    borderColor: colors.accent.blue,
-    overflow: 'hidden'
+    width: 110, height: 110, borderRadius: 55,
+    backgroundColor: '#0d1f3c', alignItems: 'center', justifyContent: 'center',
+    marginBottom: spacing.lg, borderWidth: 3, borderColor: '#4A9EFF', overflow: 'hidden',
   },
-  profileImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover'
-  },
-  photoPlaceholder: {
-    fontSize: 48
-  },
-  photoButtons: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    flexWrap: 'wrap',
-    justifyContent: 'center'
-  },
+  profileImage: { width: '100%', height: '100%', resizeMode: 'cover' },
+  photoPlaceholder: { fontSize: 52 },
+  photoButtons: { flexDirection: 'row', gap: spacing.md, flexWrap: 'wrap', justifyContent: 'center' },
   photoButton: {
-    alignItems: 'center',
-    padding: spacing.md,
-    backgroundColor: colors.background.lightGray,
-    borderRadius: borderRadius.small,
-    minWidth: 80
+    alignItems: 'center', padding: spacing.md,
+    backgroundColor: '#0d1f3c', borderRadius: borderRadius.small, minWidth: 80,
+    borderWidth: 1, borderColor: '#1a3a6b',
   },
-  removeButton: {
-    backgroundColor: colors.accent.red + '20'
-  },
-  photoButtonIcon: {
-    fontSize: 24,
-    marginBottom: spacing.xs
-  },
-  photoButtonText: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    fontWeight: '600'
-  },
-  avatarsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm
-  },
+  removeButton: { borderColor: '#FF6B6B44' },
+  photoButtonIcon: { fontSize: 22, marginBottom: 4 },
+  photoButtonText: { fontSize: 12, color: '#8ab4f8', fontWeight: '600' },
+
+  // Avatar
+  avatarsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   avatarOption: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.background.lightGray,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent'
+    width: 56, height: 56, borderRadius: 28,
+    backgroundColor: '#0d1f3c', alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: 'transparent',
   },
-  avatarOptionSelected: {
-    borderColor: colors.accent.blue,
-    backgroundColor: colors.accent.blue + '20'
-  },
-  avatarOptionText: {
-    fontSize: 32
-  },
+  avatarOptionSelected: { borderColor: '#4A9EFF', backgroundColor: '#4A9EFF22' },
+  avatarOptionText: { fontSize: 28 },
+
+  // Bio
   textArea: {
-    backgroundColor: colors.background.lightGray,
-    borderRadius: borderRadius.small,
-    padding: spacing.md,
-    fontSize: 16,
-    minHeight: 100,
-    textAlignVertical: 'top'
+    backgroundColor: '#0d1f3c', borderRadius: borderRadius.small,
+    padding: spacing.md, fontSize: 15, minHeight: 100,
+    textAlignVertical: 'top', color: '#fff',
+    borderWidth: 1, borderColor: '#1a3a6b',
   },
-  characterCount: {
-    fontSize: 12,
-    color: colors.text.secondary,
-    textAlign: 'right',
-    marginTop: spacing.xs
-  },
-  goalsGrid: {
-    gap: spacing.sm
-  },
+  characterCount: { fontSize: 12, color: '#5a7fa8', textAlign: 'right', marginTop: 6 },
+
+  // Goals
+  goalsGrid: { gap: spacing.sm },
   goalOption: {
-    backgroundColor: colors.background.lightGray,
-    padding: spacing.md,
-    borderRadius: borderRadius.small,
-    borderWidth: 2,
-    borderColor: 'transparent'
+    backgroundColor: '#0d1f3c', padding: spacing.md,
+    borderRadius: borderRadius.small, borderWidth: 2, borderColor: '#1a3a6b',
   },
-  goalOptionSelected: {
-    borderColor: colors.accent.blue,
-    backgroundColor: colors.accent.blue + '20'
-  },
-  goalOptionText: {
-    fontSize: 15,
-    color: colors.text.primary,
-    textAlign: 'center'
-  },
-  goalOptionTextSelected: {
-    fontWeight: '600',
-    color: colors.accent.blue
-  },
+  goalOptionSelected: { borderColor: '#4A9EFF', backgroundColor: '#4A9EFF15' },
+  goalOptionText: { fontSize: 15, color: '#8ab4f8', textAlign: 'center' },
+  goalOptionTextSelected: { fontWeight: '700', color: '#4A9EFF' },
+
+  // Unit toggle
   unitToggle: {
-    flexDirection: 'row',
-    marginBottom: spacing.md,
-    backgroundColor: colors.background.lightGray,
-    borderRadius: borderRadius.small,
-    padding: 4
+    flexDirection: 'row', marginBottom: spacing.md,
+    backgroundColor: '#0d1f3c', borderRadius: borderRadius.small,
+    padding: 4, borderWidth: 1, borderColor: '#1a3a6b',
   },
-  unitButton: {
-    flex: 1,
-    paddingVertical: spacing.sm,
-    alignItems: 'center',
-    borderRadius: borderRadius.small
-  },
-  unitButtonActive: {
-    backgroundColor: colors.accent.blue
-  },
-  unitButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.secondary
-  },
-  unitButtonTextActive: {
-    color: colors.text.white
-  },
-  inputRow: {
-    flexDirection: 'row',
-    gap: spacing.md
-  },
-  inputGroup: {
-    flex: 1
-  },
-  inputLabel: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginBottom: spacing.xs
-  },
+  unitButton: { flex: 1, paddingVertical: spacing.sm, alignItems: 'center', borderRadius: borderRadius.small },
+  unitButtonActive: { backgroundColor: '#4A9EFF' },
+  unitButtonText: { fontSize: 14, fontWeight: '600', color: '#5a7fa8' },
+  unitButtonTextActive: { color: '#fff' },
+
+  // Inputs
+  inputRow: { flexDirection: 'row', gap: spacing.md },
+  inputGroup: { flex: 1 },
+  inputLabel: { fontSize: 13, color: '#5a7fa8', marginBottom: 6 },
   input: {
-    backgroundColor: colors.background.lightGray,
-    borderRadius: borderRadius.small,
-    padding: spacing.md,
-    fontSize: 16
+    backgroundColor: '#0d1f3c', borderRadius: borderRadius.small,
+    padding: spacing.md, fontSize: 16, color: '#fff',
+    borderWidth: 1, borderColor: '#1a3a6b',
   },
-  bottomSpacer: {
-    height: 100
+
+  // Gender toggle
+  genderToggle: {
+    flexDirection: 'row', marginBottom: spacing.md,
+    backgroundColor: '#0d1f3c', borderRadius: borderRadius.small,
+    padding: 4, borderWidth: 1, borderColor: '#1a3a6b',
   },
+  genderButton: { flex: 1, paddingVertical: 10, alignItems: 'center', borderRadius: borderRadius.small },
+  genderButtonActive: { backgroundColor: '#4A9EFF' },
+  genderButtonText: { fontSize: 15, fontWeight: '700', color: '#5a7fa8' },
+  genderButtonTextActive: { color: '#fff' },
+
+  // Measurement grid
+  measureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  measureField: { width: '47%' },
+  measureLabel: { fontSize: 12, color: '#8ab4f8', marginBottom: 6, fontWeight: '600' },
+  measureInputRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#0d1f3c', borderRadius: borderRadius.small,
+    borderWidth: 1, borderColor: '#1a3a6b', overflow: 'hidden',
+  },
+  measureInput: { flex: 1, padding: 10, fontSize: 15, color: '#fff' },
+  measureUnit: { paddingHorizontal: 10, color: '#5a7fa8', fontSize: 12, fontWeight: '600' },
+
+  // Security row
+  securityRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#0d1f3c', borderRadius: 12, padding: spacing.md,
+    borderWidth: 1, borderColor: '#1a3a6b', gap: 12,
+  },
+  securityIcon: { fontSize: 22 },
+  securityRowText: { fontSize: 15, color: '#fff', fontWeight: '600' },
+  securityRowSub: { fontSize: 12, color: '#5a7fa8', marginTop: 2 },
+  securityChevron: { fontSize: 22, color: '#5a7fa8' },
+
+  // Loading overlay
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center'
-  }
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center', alignItems: 'center',
+  },
+
+  // Password modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: '#0a1628', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, paddingBottom: 44,
+  },
+  modalHandle: {
+    width: 40, height: 4, backgroundColor: '#1a3a6b',
+    borderRadius: 2, alignSelf: 'center', marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 11, fontWeight: '800', letterSpacing: 2,
+    color: '#5a7fa8', textAlign: 'center', marginBottom: 20,
+  },
+  pwLabel: { fontSize: 13, color: '#8ab4f8', marginBottom: 6, marginTop: 12, fontWeight: '600' },
+  pwRow: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#0d1f3c', borderRadius: borderRadius.small,
+    borderWidth: 1, borderColor: '#1a3a6b',
+  },
+  pwInput: { flex: 1, padding: spacing.md, fontSize: 15, color: '#fff' },
+  eyeBtn: { paddingHorizontal: 14 },
+  rulesCard: {
+    backgroundColor: '#0d1f3c', borderRadius: 10, padding: 12, marginTop: 10,
+    borderLeftWidth: 3, borderLeftColor: '#4A9EFF',
+  },
+  errorBox: {
+    backgroundColor: '#FF6B6B22', borderRadius: 10, padding: 12, marginTop: 12,
+    borderLeftWidth: 3, borderLeftColor: '#FF6B6B',
+  },
+  errorText: { color: '#FF6B6B', fontSize: 13, fontWeight: '600' },
+  pwSaveButton: {
+    backgroundColor: '#4A9EFF', borderRadius: borderRadius.small,
+    padding: spacing.md, alignItems: 'center', marginTop: 20, minHeight: 50, justifyContent: 'center',
+  },
+  pwSaveButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
 });

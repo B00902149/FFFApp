@@ -23,6 +23,7 @@
     "expo-image-picker": "~17.0.10",
     "expo-sensors": "~15.0.8",
     "expo-status-bar": "~3.0.9",
+    "nodemailer": "^8.0.1",
     "react": "19.1.0",
     "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",

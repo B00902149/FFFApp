@@ -1,206 +1,380 @@
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  TextInput, 
-  TouchableOpacity, 
-  StyleSheet, 
-  Alert,
-  ActivityIndicator,
-  Image
+import React, { useState, useRef } from 'react';
+import {
+  View, Text, TextInput, TouchableOpacity, StyleSheet,
+  Alert, ActivityIndicator, Image, ScrollView, KeyboardAvoidingView, Platform, Modal
 } from 'react-native';
 import { colors, spacing, borderRadius } from '../theme/colors';
 import { authAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
+const MAX_ATTEMPTS = 3;
+
+const PASSWORD_RULES = [
+  { label: 'At least 9 characters',          test: (p: string) => p.length >= 9 },
+  { label: 'One uppercase letter',            test: (p: string) => /[A-Z]/.test(p) },
+  { label: 'One number',                      test: (p: string) => /[0-9]/.test(p) },
+  { label: 'One special character (!@#$etc)', test: (p: string) => /[^A-Za-z0-9]/.test(p) },
+];
+
+const validatePassword = (p: string) => PASSWORD_RULES.every(r => r.test(p));
+
 export const LoginScreen = ({ navigation }: any) => {
   const { login: saveAuth } = useAuth();
+  const scrollRef = useRef<ScrollView>(null);
   const [isSignUp, setIsSignUp] = useState(false);
+
   const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [surname, setSurname] = useState('');
+  const [username, setUsername] = useState('');
+  const [country, setCountry] = useState('');
+  const [mobile, setMobile] = useState('');
+
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false);
+
+  const [loginError, setLoginError] = useState('');
+  const [attempts, setAttempts] = useState(0);
+  const [locked, setLocked] = useState(false);
+
+  const [forgotVisible, setForgotVisible] = useState(false);
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetSent, setResetSent] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+
+  const resetFields = () => {
+    setEmail(''); setPassword(''); setFirstName(''); setSurname('');
+    setUsername(''); setCountry(''); setMobile('');
+    setLoginError(''); setAttempts(0); setLocked(false);
+  };
 
   const handleLogin = async () => {
-    if (!email || !password) {
-      Alert.alert('Error', 'Please enter email and password');
-      return;
-    }
+    if (locked) return;
+    if (!email || !password) { setLoginError('Please enter your email and password.'); return; }
     setLoading(true);
+    setLoginError('');
     try {
       const data = await authAPI.login(email, password);
       if (data?.token && data?.user) {
+        setAttempts(0);
         await saveAuth(data.token, data.user);
-        Alert.alert('Success', 'Welcome back!');
-        // NO navigation.navigate here
       } else {
-        Alert.alert('Error', 'Server response was incomplete');
+        setLoginError('Server response was incomplete.');
       }
     } catch (err: any) {
-      Alert.alert('Error Detail', JSON.stringify(err?.response?.data || err?.message || err));
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
+      if (newAttempts >= MAX_ATTEMPTS) {
+        setLocked(true);
+        setLoginError('Too many failed attempts. Please reset your password.');
+      } else {
+        const remaining = MAX_ATTEMPTS - newAttempts;
+        setLoginError(`Incorrect email or password. ${remaining} attempt${remaining === 1 ? '' : 's'} remaining.`);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleSignUp = async () => {
-    if (!email || !username || !password) {
-      Alert.alert('Error', 'Please fill in all fields');
+    if (!firstName || !surname || !email || !username || !password || !country) {
+      Alert.alert('Error', 'Please fill in all required fields');
       return;
     }
-
-    if (password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+    if (!validatePassword(password)) {
+      Alert.alert('Weak Password', 'Please meet all password requirements.');
       return;
     }
-
     setLoading(true);
     try {
-      await authAPI.register(email, username, password);
-      Alert.alert('Success', 'Account created! Now please log in.');
+      await authAPI.register(email, username, password, firstName, surname, country, mobile);
+      Alert.alert('Success', 'Account created! Please log in.');
       setIsSignUp(false);
-      setPassword('');
+      resetFields();
     } catch (err: any) {
-      const message = err?.error || err?.message || 'Registration failed';
-      Alert.alert('Error', message);
+      Alert.alert('Error', err?.error || err?.message || 'Registration failed');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!resetEmail) { Alert.alert('Error', 'Please enter your email address.'); return; }
+    setResetLoading(true);
+    try {
+      await authAPI.forgotPassword(resetEmail);
+    } catch (_) {
+      // Fail silently — don't reveal whether email exists
+    } finally {
+      setResetLoading(false);
+      setResetSent(true);
+    }
+  };
+
+  const showRules = isSignUp && (passwordFocused || password.length > 0);
+
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Image
-          source={require('../../assets/mainlogo.png')}
-          style={styles.logo}
-          resizeMode="cover"
-        />
-        <Text style={styles.tagline}>One Hub. Infinite Possibilities.</Text>
-      </View>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.scroll}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.header}>
+          <Image source={require('../../assets/mainlogo.png')} style={styles.logo} resizeMode="cover" />
+          <Text style={styles.tagline}>One Hub. Infinite Possibilities.</Text>
+        </View>
 
-      <View style={styles.form}>
-        <TextInput
-          style={styles.input}
-          placeholder="Email"
-          placeholderTextColor={colors.text.secondary}
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
-          autoCapitalize="none"
-          editable={!loading}
-        />
+        <View style={styles.form}>
+          {isSignUp && (
+            <View style={styles.row}>
+              <TextInput
+                style={[styles.input, styles.halfInput]}
+                placeholder="First Name *"
+                placeholderTextColor={colors.text.secondary}
+                value={firstName}
+                onChangeText={setFirstName}
+                autoCapitalize="words"
+                editable={!loading}
+              />
+              <TextInput
+                style={[styles.input, styles.halfInput]}
+                placeholder="Surname *"
+                placeholderTextColor={colors.text.secondary}
+                value={surname}
+                onChangeText={setSurname}
+                autoCapitalize="words"
+                editable={!loading}
+              />
+            </View>
+          )}
 
-        {isSignUp && (
           <TextInput
             style={styles.input}
-            placeholder="Username"
+            placeholder="Email *"
             placeholderTextColor={colors.text.secondary}
-            value={username}
-            onChangeText={setUsername}
+            value={email}
+            onChangeText={v => { setEmail(v); setLoginError(''); }}
+            keyboardType="email-address"
             autoCapitalize="none"
-            editable={!loading}
+            editable={!loading && !locked}
           />
-        )}
 
-        <TextInput
-          style={styles.input}
-          placeholder="Password"
-          placeholderTextColor={colors.text.secondary}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          editable={!loading}
-        />
-
-        <TouchableOpacity 
-          style={[styles.button, loading && styles.buttonDisabled]} 
-          onPress={isSignUp ? handleSignUp : handleLogin}
-          disabled={loading}
-        >
-          {loading ? (
-            <ActivityIndicator color={colors.text.white} />
-          ) : (
-            <Text style={styles.buttonText}>
-              {isSignUp ? 'Sign Up' : 'Log In'}
-            </Text>
+          {isSignUp && (
+            <TextInput
+              style={styles.input}
+              placeholder="Username *"
+              placeholderTextColor={colors.text.secondary}
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+              editable={!loading}
+            />
           )}
-        </TouchableOpacity>
 
-        <TouchableOpacity 
-          onPress={() => setIsSignUp(!isSignUp)}
-          disabled={loading}
-        >
-          <Text style={styles.switchText}>
-            {isSignUp 
-              ? 'Already have an account? Log In' 
-              : "Don't have an account? Sign Up"}
-          </Text>
+          <View style={[styles.passwordRow, locked && styles.inputLocked]}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="Password *"
+              placeholderTextColor={colors.text.secondary}
+              value={password}
+              onChangeText={v => { setPassword(v); setLoginError(''); }}
+              secureTextEntry={!showPassword}
+              editable={!loading && !locked}
+              onFocus={() => setPasswordFocused(true)}
+              onBlur={() => setPasswordFocused(false)}
+            />
+            <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPassword(!showPassword)}>
+              <Text style={styles.eyeIcon}>{showPassword ? '🙈' : '👁️'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          {!!loginError && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorIcon}>⚠️</Text>
+              <Text style={styles.errorText}>{loginError}</Text>
+            </View>
+          )}
+
+          {showRules && (
+            <View style={styles.rulesCard}>
+              {PASSWORD_RULES.map((rule, i) => {
+                const passed = rule.test(password);
+                return (
+                  <View key={i} style={styles.ruleRow}>
+                    <Text style={[styles.ruleIcon, passed && styles.ruleIconPass]}>{passed ? '✓' : '○'}</Text>
+                    <Text style={[styles.ruleText, passed && styles.ruleTextPass]}>{rule.label}</Text>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {isSignUp && (
+            <>
+              <TextInput
+                style={styles.input}
+                placeholder="Country *"
+                placeholderTextColor={colors.text.secondary}
+                value={country}
+                onChangeText={setCountry}
+                autoCapitalize="words"
+                editable={!loading}
+                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)}
+              />
+              <TextInput
+                style={styles.input}
+                placeholder="Mobile Number (optional)"
+                placeholderTextColor={colors.text.secondary}
+                value={mobile}
+                onChangeText={setMobile}
+                keyboardType="phone-pad"
+                editable={!loading}
+                onFocus={() => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 300)}
+              />
+              <Text style={styles.requiredNote}>* Required fields</Text>
+            </>
+          )}
+
+          <TouchableOpacity
+            style={[styles.button, (loading || locked) && styles.buttonDisabled]}
+            onPress={isSignUp ? handleSignUp : handleLogin}
+            disabled={loading || locked}
+          >
+            {loading
+              ? <ActivityIndicator color={colors.text.white} />
+              : <Text style={styles.buttonText}>{isSignUp ? 'Sign Up' : 'Log In'}</Text>
+            }
+          </TouchableOpacity>
+
+          {!isSignUp && (
+            <TouchableOpacity
+              onPress={() => { setForgotVisible(true); setResetSent(false); setResetEmail(''); }}
+              disabled={loading}
+            >
+              <Text style={styles.forgotText}>Forgot password?</Text>
+            </TouchableOpacity>
+          )}
+
+          <TouchableOpacity onPress={() => { setIsSignUp(!isSignUp); resetFields(); }} disabled={loading}>
+            <Text style={styles.switchText}>
+              {isSignUp ? 'Already have an account? Log In' : "Don't have an account? Sign Up"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      <Modal visible={forgotVisible} transparent animationType="slide" onRequestClose={() => setForgotVisible(false)}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setForgotVisible(false)}>
+          <TouchableOpacity style={styles.modalSheet} activeOpacity={1}>
+            <View style={styles.modalHandle} />
+            <Text style={styles.modalTitle}>RESET PASSWORD</Text>
+
+            {resetSent ? (
+              <>
+                <Text style={styles.resetSuccessIcon}>📧</Text>
+                <Text style={styles.resetSuccessText}>
+                  If an account exists for that email, a reset link has been sent.
+                </Text>
+                <TouchableOpacity style={styles.button} onPress={() => setForgotVisible(false)}>
+                  <Text style={styles.buttonText}>Back to Login</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Text style={styles.resetHint}>Enter your email and we'll send you a reset link.</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Email address"
+                  placeholderTextColor={colors.text.secondary}
+                  value={resetEmail}
+                  onChangeText={setResetEmail}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                  autoFocus
+                />
+                <TouchableOpacity
+                  style={[styles.button, resetLoading && styles.buttonDisabled]}
+                  onPress={handleForgotPassword}
+                  disabled={resetLoading}
+                >
+                  {resetLoading
+                    ? <ActivityIndicator color="#fff" />
+                    : <Text style={styles.buttonText}>Send Reset Link</Text>
+                  }
+                </TouchableOpacity>
+                <TouchableOpacity style={{ marginTop: 12 }} onPress={() => setForgotVisible(false)}>
+                  <Text style={[styles.forgotText, { textAlign: 'center' }]}>Cancel</Text>
+                </TouchableOpacity>
+              </>
+            )}
+          </TouchableOpacity>
         </TouchableOpacity>
-      </View>
-    </View>
+      </Modal>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.primary.dark,
-    padding: spacing.lg,
-    justifyContent: 'center'
-  },
- header: {
-   alignItems: 'center',
-   marginBottom: 0,        // ← was spacing.xl * 2
-   paddingBottom: 0,
- },
-
- logo: {
-   width: '100%',
-   height: 120,            // ← reduce height to remove black space
-   marginBottom: 24,       // ← controlled gap to inputs
-   resizeMode: 'contain',
- },
-  tagline: {
-    color: '#ffffff',
-    fontSize: 14,
-    letterSpacing: 1.5,
-    textAlign: 'center',
-    marginBottom: 32,
-    fontStyle: 'italic',
-  },
-  form: {
-    marginBottom: spacing.xl
-  },
+  scroll: { flexGrow: 1, backgroundColor: colors.primary.dark, padding: spacing.lg, justifyContent: 'center' },
+  header: { alignItems: 'center' },
+  logo: { width: '100%', height: 120, marginBottom: 24 },
+  tagline: { color: '#fff', fontSize: 14, letterSpacing: 1.5, textAlign: 'center', marginBottom: 32, fontStyle: 'italic' },
+  form: { marginBottom: spacing.xl },
+  row: { flexDirection: 'row', gap: 10 },
+  halfInput: { flex: 1 },
   input: {
+    backgroundColor: 'rgba(255,255,255,0.9)', borderRadius: borderRadius.small,
+    padding: spacing.md, marginBottom: spacing.md, fontSize: 16, color: colors.text.primary,
+  },
+  inputLocked: { opacity: 0.5 },
+  passwordRow: {
+    flexDirection: 'row', alignItems: 'center',
     backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: borderRadius.small,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    fontSize: 16,
-    color: colors.text.primary
+    borderRadius: borderRadius.small, marginBottom: spacing.md,
   },
+  passwordInput: { flex: 1, padding: spacing.md, fontSize: 16, color: colors.text.primary },
+  eyeBtn: { paddingHorizontal: 14 },
+  eyeIcon: { fontSize: 18 },
+  errorBox: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: '#FF6B6B22', borderRadius: 10,
+    padding: 12, marginBottom: spacing.md,
+    borderLeftWidth: 3, borderLeftColor: '#FF6B6B', gap: 8,
+  },
+  errorIcon: { fontSize: 16 },
+  errorText: { flex: 1, color: '#FF6B6B', fontSize: 13, fontWeight: '600' },
+  rulesCard: {
+    backgroundColor: '#0d1f3c', borderRadius: 12,
+    padding: 14, marginBottom: spacing.md,
+    borderLeftWidth: 3, borderLeftColor: '#4A9EFF',
+  },
+  ruleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
+  ruleIcon: { color: '#2a4a7f', fontSize: 14, fontWeight: '800', marginRight: 10, width: 16 },
+  ruleIconPass: { color: '#26de81' },
+  ruleText: { color: '#5a7fa8', fontSize: 13 },
+  ruleTextPass: { color: '#26de81' },
+  requiredNote: { color: '#5a7fa8', fontSize: 12, marginBottom: spacing.md, marginTop: -8 },
   button: {
-    backgroundColor: colors.accent.blue,
-    borderRadius: borderRadius.small,
-    padding: spacing.md,
-    alignItems: 'center',
-    marginTop: spacing.sm,
-    minHeight: 50,
-    justifyContent: 'center'
+    backgroundColor: colors.accent.blue, borderRadius: borderRadius.small,
+    padding: spacing.md, alignItems: 'center', marginTop: spacing.sm,
+    minHeight: 50, justifyContent: 'center',
   },
-  buttonDisabled: {
-    opacity: 0.6
+  buttonDisabled: { opacity: 0.5 },
+  buttonText: { color: colors.text.white, fontSize: 16, fontWeight: 'bold' },
+  forgotText: { color: '#8ab4f8', textAlign: 'center', marginTop: spacing.md, fontSize: 14 },
+  switchText: { color: colors.text.white, textAlign: 'center', marginTop: spacing.sm, fontSize: 14 },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
+  modalSheet: {
+    backgroundColor: colors.primary.dark, borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    padding: 24, paddingBottom: 44,
   },
-  buttonText: {
-    color: colors.text.white,
-    fontSize: 16,
-    fontWeight: 'bold'
-  },
-  switchText: {
-    color: colors.text.white,
-    textAlign: 'center',
-    marginTop: spacing.md,
-    fontSize: 14
-  }
+  modalHandle: { width: 40, height: 4, backgroundColor: '#1a3a6b', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
+  modalTitle: { color: '#5a7fa8', fontSize: 11, fontWeight: '800', letterSpacing: 2, textAlign: 'center', marginBottom: 16 },
+  resetHint: { color: '#8ab4f8', fontSize: 14, textAlign: 'center', marginBottom: 20 },
+  resetSuccessIcon: { fontSize: 48, textAlign: 'center', marginVertical: 16 },
+  resetSuccessText: { color: '#26de81', fontSize: 15, textAlign: 'center', marginBottom: 24, lineHeight: 22 },
 });

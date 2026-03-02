@@ -4,6 +4,7 @@ import {
   Alert, KeyboardAvoidingView, Platform, ScrollView, Modal
 } from 'react-native';
 import { workoutAPI } from '../services/api';
+import { useDailyQuote } from '../hooks/useDailyQuote';
 
 const RATING_LABELS: Record<number, string> = {
   1: 'Rough session 😅',
@@ -14,12 +15,14 @@ const RATING_LABELS: Record<number, string> = {
 };
 
 export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
-  const { workout, onComplete } = route.params || {};
+  const { workout } = route.params || {};
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState('');
   const [loading, setLoading] = useState(false);
   const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [templateName, setTemplateName] = useState('');
+
+  const { quote, loading: quoteLoading } = useDailyQuote();
 
   const totalSets = workout?.exercises?.reduce((t: number, ex: any) => t + ex.sets.length, 0) || 0;
   const completedSets = workout?.exercises?.reduce((t: number, ex: any) =>
@@ -38,7 +41,7 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
         'Workout Complete! 🎉',
         'Great job! Would you like to save this as a template?',
         [
-          { text: 'No Thanks', style: 'cancel', onPress: () => { if (onComplete) onComplete(); navigation.goBack(); } },
+          { text: 'No Thanks', style: 'cancel', onPress: () => { navigation.popToTop(); } },
           { text: 'Save Template', onPress: () => { setTemplateName(workout.title); setShowTemplateModal(true); } },
         ]
       );
@@ -54,7 +57,7 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
       await workoutAPI.saveAsTemplate(workout._id, templateName.trim());
       setShowTemplateModal(false);
       Alert.alert('Saved! 💪', 'Template saved! Access it anytime from the Templates screen.', [
-        { text: 'OK', onPress: () => { if (onComplete) onComplete(); navigation.popToTop(); } }
+        { text: 'OK', onPress: () => { navigation.popToTop(); } }
       ]);
     } catch {
       Alert.alert('Error', 'Failed to save template');
@@ -103,9 +106,7 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
               </TouchableOpacity>
             ))}
           </View>
-          {rating > 0 && (
-            <Text style={styles.ratingLabel}>{RATING_LABELS[rating]}</Text>
-          )}
+          {rating > 0 && <Text style={styles.ratingLabel}>{RATING_LABELS[rating]}</Text>}
         </View>
 
         {/* Notes */}
@@ -123,14 +124,21 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
           />
         </View>
 
-        {/* Prayer Card */}
-        <View style={styles.prayerCard}>
-          <Text style={styles.prayerIcon}>🙏</Text>
+        {/* Daily Quote */}
+        <View style={styles.quoteCard}>
+          <Text style={styles.quoteIcon}>✨</Text>
           <View style={{ flex: 1 }}>
-            <Text style={styles.prayerTitle}>Take a moment to pray</Text>
-            <Text style={styles.prayerText}>
-              Thank God for the strength to complete this workout and ask for continued discipline in your fitness journey.
-            </Text>
+            <Text style={styles.quoteLabel}>DAILY INSPIRATION</Text>
+            {quoteLoading ? (
+              <Text style={styles.quoteText}>Loading quote...</Text>
+            ) : quote ? (
+              <>
+                <Text style={styles.quoteText}>"{quote.quote}"</Text>
+                {quote.author ? <Text style={styles.quoteAuthor}>— {quote.author}</Text> : null}
+              </>
+            ) : (
+              <Text style={styles.quoteText}>"Discipline is doing what needs to be done, even when you don't want to."</Text>
+            )}
           </View>
         </View>
 
@@ -165,7 +173,7 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
             <View style={styles.modalButtons}>
               <TouchableOpacity
                 style={styles.modalCancelBtn}
-                onPress={() => { setShowTemplateModal(false); if (onComplete) onComplete(); navigation.goBack(); }}
+                onPress={() => { setShowTemplateModal(false); navigation.popToTop(); }}
               >
                 <Text style={styles.modalCancelText}>Cancel</Text>
               </TouchableOpacity>
@@ -184,13 +192,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a1628' },
   content: { padding: 16, paddingTop: 60 },
 
-  // Header
   header: { alignItems: 'center', marginBottom: 20 },
   headerEmoji: { fontSize: 64, marginBottom: 12 },
   headerTitle: { color: '#fff', fontSize: 28, fontWeight: '800', marginBottom: 6 },
   headerSub: { color: '#5a7fa8', fontSize: 15, fontWeight: '600' },
 
-  // Stats
   statsCard: {
     backgroundColor: '#0d1f3c', borderRadius: 16,
     padding: 18, marginBottom: 14,
@@ -203,7 +209,6 @@ const styles = StyleSheet.create({
   statLabel: { color: '#5a7fa8', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   statDivider: { width: 1, height: 40, backgroundColor: '#1a3a6b' },
 
-  // Rating
   card: {
     backgroundColor: '#0d1f3c', borderRadius: 16,
     padding: 18, marginBottom: 14,
@@ -215,24 +220,23 @@ const styles = StyleSheet.create({
   starFilled: { color: '#FFD700' },
   ratingLabel: { color: '#FFD700', fontSize: 15, fontWeight: '700', textAlign: 'center' },
 
-  // Notes
   textInput: {
     backgroundColor: '#0a1628', borderRadius: 12,
     padding: 14, fontSize: 15, color: '#fff',
     minHeight: 100, borderWidth: 1, borderColor: '#1a3a6b',
   },
 
-  // Prayer
-  prayerCard: {
+  // Daily quote
+  quoteCard: {
     flexDirection: 'row', backgroundColor: '#0d1f3c',
     borderRadius: 16, padding: 18, marginBottom: 20,
     borderLeftWidth: 3, borderLeftColor: '#4A9EFF',
   },
-  prayerIcon: { fontSize: 28, marginRight: 14 },
-  prayerTitle: { color: '#fff', fontSize: 15, fontWeight: '800', marginBottom: 6 },
-  prayerText: { color: '#c8d8f0', fontSize: 13, lineHeight: 20 },
+  quoteIcon: { fontSize: 28, marginRight: 14 },
+  quoteLabel: { color: '#5a7fa8', fontSize: 10, fontWeight: '800', letterSpacing: 2, marginBottom: 8 },
+  quoteText: { color: '#c8d8f0', fontSize: 13, lineHeight: 20, fontStyle: 'italic' },
+  quoteAuthor: { color: '#4A9EFF', fontSize: 12, fontWeight: '700', marginTop: 6 },
 
-  // Complete Button
   completeBtn: {
     backgroundColor: '#26de81', borderRadius: 14,
     padding: 16, alignItems: 'center', elevation: 4,
@@ -240,7 +244,6 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.6 },
   completeBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
 
-  // Modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: '#0d1f3c', borderTopLeftRadius: 24, borderTopRightRadius: 24,

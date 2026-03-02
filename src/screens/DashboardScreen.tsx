@@ -4,11 +4,13 @@ import { nutritionAPI, profileAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useDailyQuote } from '../hooks/useDailyQuote';
 
+
 export const DashboardScreen = ({ navigation }: any) => {
   const { user } = useAuth();
   const quote = useDailyQuote();
   const [loading, setLoading] = useState(false);
   const [todaySummary, setTodaySummary] = useState({ workouts: 0, calories: 0, posts: 0 });
+
 
   useEffect(() => {
     loadTodaySummary();

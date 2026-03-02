@@ -5,12 +5,6 @@ const nodemailer = require('nodemailer');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
-// ── Email transporter ─────────────────────────────────────────────────────────
-// Add to your .env:
-//   EMAIL_USER=yourapp@gmail.com
-//   EMAIL_PASS=your_gmail_app_password  (Gmail App Password, not real password)
-//   APP_URL=http://192.168.0.70:5000    (or your deployed URL)
-
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: {

@@ -210,7 +210,7 @@ export const ExerciseProgressScreen = ({ route, navigation }: any) => {
   };
 
   const navigateToComplete = () => {
-    navigation.navigate('CompleteWorkout', { workout: currentWorkout, onComplete: () => navigation.popToTop() });
+    navigation.navigate('CompleteWorkout', { workout: currentWorkout });
   };
 
   const totalSets = currentWorkout?.exercises?.reduce((t: number, ex: any) => t + ex.sets.length, 0) || 0;

@@ -39,7 +39,7 @@ export const ExerciseDetailScreen = ({ route, navigation }: any) => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Go to Exercise Screen',
-          onPress: () => navigation.navigate('ExerciseTab')
+          onPress: () => navigation.navigate('Exercise')
         }
       ]
     );

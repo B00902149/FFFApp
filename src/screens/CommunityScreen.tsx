@@ -3,17 +3,19 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, A
 import { useAuth } from '../context/AuthContext';
 import { postsAPI } from '../services/api';
 
+// Shape of a community post returned from the API
 interface Post {
   _id: string;
   userId: string;
   username: string;
   category: string;
   content: string;
-  likes: string[];
+  likes: string[];   // array of user IDs who liked the post
   comments: any[];
   createdAt: string;
 }
 
+// Maps each post category to a display icon and accent colour
 const CATEGORY_CONFIG: Record<string, { icon: string; color: string }> = {
   'Help Request':  { icon: '🆘', color: '#7B6FFF' },
   'Testimony':     { icon: '✨', color: '#FFD700' },
@@ -22,26 +24,32 @@ const CATEGORY_CONFIG: Record<string, { icon: string; color: string }> = {
   'default':       { icon: '📝', color: '#4A9EFF' },
 };
 
+// Converts an ISO date string into a human-readable relative time label
 const getTimeAgo = (dateString: string) => {
   const seconds = Math.floor((Date.now() - new Date(dateString).getTime()) / 1000);
-  if (seconds < 60) return 'just now';
-  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 60)     return 'just now';
+  if (seconds < 3600)   return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400)  return `${Math.floor(seconds / 3600)}h ago`;
   if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  // Older than 7 days: show short date instead
   return new Date(dateString).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
 };
 
 export const CommunityScreen = ({ navigation }: any) => {
   const { user } = useAuth();
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [activeFilter, setActiveFilter] = useState('All');
 
+  const [posts, setPosts]               = useState<Post[]>([]);
+  const [loading, setLoading]           = useState(true);
+  const [refreshing, setRefreshing]     = useState(false);
+  const [activeFilter, setActiveFilter] = useState('All'); // currently selected category filter
+
+  // 'All' shows everything; other values filter by category
   const filters = ['All', 'Help Request', 'Testimony', 'Encouragement', 'Victory'];
 
+  // Load posts on first render
   useEffect(() => { loadPosts(); }, []);
 
+  // Fetches the latest 20 posts from the API
   const loadPosts = async () => {
     try {
       setLoading(true);
@@ -51,28 +59,35 @@ export const CommunityScreen = ({ navigation }: any) => {
       Alert.alert('Error', 'Failed to load community posts');
     } finally {
       setLoading(false);
-      setRefreshing(false);
+      setRefreshing(false); // also resets pull-to-refresh spinner
     }
   };
 
+  // Toggles a like on a post and updates that post in local state
   const handleLike = async (postId: string) => {
     if (!user?.id) return;
     try {
       const updatedPost = await postsAPI.likePost(postId, user.id);
+      // Replace only the liked post in the list, keep everything else unchanged
       setPosts(posts.map(p => p._id === postId ? updatedPost : p));
     } catch {
       console.error('Failed to like post');
     }
   };
 
+  // Navigates to the CreatePost screen and prepends the new post to the feed on return
   const handleCreatePost = () => {
     navigation.navigate('CreatePost', {
       onPostCreated: (newPost: Post) => setPosts([newPost, ...posts]),
     });
   };
 
-  const filteredPosts = activeFilter === 'All' ? posts : posts.filter(p => p.category === activeFilter);
+  // Filters posts client-side based on the active category tab
+  const filteredPosts = activeFilter === 'All'
+    ? posts
+    : posts.filter(p => p.category === activeFilter);
 
+  // Full-screen loader shown only on the initial load (not on pull-to-refresh)
   if (loading && posts.length === 0) {
     return (
       <View style={styles.centered}>
@@ -84,18 +99,20 @@ export const CommunityScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+
+      {/* ── Header: Back / Title / New Post ── */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title}>COMMUNITY</Text>
+        {/* "+" button opens the CreatePost screen */}
         <TouchableOpacity style={styles.createBtn} onPress={handleCreatePost}>
           <Text style={styles.createBtnText}>+</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Faith Banner */}
+      {/* ── Faith Banner ── */}
       <View style={styles.banner}>
         <Text style={styles.bannerIcon}>💬</Text>
         <View style={{ flex: 1 }}>
@@ -104,7 +121,7 @@ export const CommunityScreen = ({ navigation }: any) => {
         </View>
       </View>
 
-      {/* Category Filters */}
+      {/* ── Category Filter Pills ── */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -117,6 +134,7 @@ export const CommunityScreen = ({ navigation }: any) => {
           return (
             <TouchableOpacity
               key={filter}
+              // Active pill uses the category's accent colour (blue for 'All')
               style={[styles.filterPill, isActive && { backgroundColor: filter === 'All' ? '#4A9EFF' : cfg.color }]}
               onPress={() => setActiveFilter(filter)}
             >
@@ -129,12 +147,13 @@ export const CommunityScreen = ({ navigation }: any) => {
         })}
       </ScrollView>
 
-      {/* Feed */}
+      {/* ── Post Feed ── */}
       <ScrollView
         style={styles.feed}
         contentContainerStyle={styles.feedContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
+          // Pull-to-refresh reloads posts from the API
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => { setRefreshing(true); loadPosts(); }}
@@ -144,6 +163,8 @@ export const CommunityScreen = ({ navigation }: any) => {
         }
       >
         {filteredPosts.length === 0 ? (
+
+          /* ── Empty State ── */
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>🌟</Text>
             <Text style={styles.emptyTitle}>
@@ -154,16 +175,21 @@ export const CommunityScreen = ({ navigation }: any) => {
               <Text style={styles.emptyBtnText}>+ Create Post</Text>
             </TouchableOpacity>
           </View>
+
         ) : (
+
+          /* ── Post Cards ── */
           filteredPosts.map(post => {
-            const cfg = CATEGORY_CONFIG[post.category] || CATEGORY_CONFIG['default'];
+            const cfg     = CATEGORY_CONFIG[post.category] || CATEGORY_CONFIG['default'];
             const isLiked = user?.id ? post.likes.includes(user.id) : false;
-            const initials = post.username.charAt(0).toUpperCase();
+            const initials = post.username.charAt(0).toUpperCase(); // avatar letter
 
             return (
               <View key={post._id} style={[styles.postCard, { borderTopColor: cfg.color }]}>
-                {/* Post Header */}
+
+                {/* Post Header: avatar + username + category badge */}
                 <View style={styles.postHeader}>
+                  {/* Coloured circle avatar using first letter of username */}
                   <View style={[styles.avatar, { backgroundColor: cfg.color + '30' }]}>
                     <Text style={[styles.avatarText, { color: cfg.color }]}>{initials}</Text>
                   </View>
@@ -171,17 +197,19 @@ export const CommunityScreen = ({ navigation }: any) => {
                     <Text style={styles.username}>{post.username}</Text>
                     <Text style={styles.timestamp}>{getTimeAgo(post.createdAt)}</Text>
                   </View>
+                  {/* Category badge in top-right of card */}
                   <View style={[styles.categoryPill, { backgroundColor: cfg.color + '20' }]}>
                     <Text style={styles.categoryPillIcon}>{cfg.icon}</Text>
                     <Text style={[styles.categoryPillText, { color: cfg.color }]}>{post.category}</Text>
                   </View>
                 </View>
 
-                {/* Content */}
+                {/* Post body text */}
                 <Text style={styles.postContent}>{post.content}</Text>
 
-                {/* Actions */}
+                {/* Like + Comment action buttons */}
                 <View style={styles.postActions}>
+                  {/* Like button — turns red if current user has already liked */}
                   <TouchableOpacity style={styles.actionBtn} onPress={() => handleLike(post._id)}>
                     <Text style={styles.actionIcon}>{isLiked ? '❤️' : '🤍'}</Text>
                     <Text style={[styles.actionText, isLiked && { color: '#FF6B6B' }]}>
@@ -189,10 +217,12 @@ export const CommunityScreen = ({ navigation }: any) => {
                     </Text>
                   </TouchableOpacity>
 
+                  {/* Comment button — navigates to PostDetail screen */}
                   <TouchableOpacity
                     style={styles.actionBtn}
                     onPress={() => navigation.navigate('PostDetail', {
                       post,
+                      // Callback updates this post in the feed when comments change
                       onUpdate: (updated: Post) => setPosts(posts.map(p => p._id === updated._id ? updated : p)),
                     })}
                   >
@@ -202,10 +232,13 @@ export const CommunityScreen = ({ navigation }: any) => {
                     </Text>
                   </TouchableOpacity>
                 </View>
+
               </View>
             );
           })
         )}
+
+        {/* Bottom padding so last card isn't hidden behind tab bar */}
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>

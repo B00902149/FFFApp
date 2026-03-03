@@ -1,60 +1,97 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { workoutAPI } from '../services/api';
 import { useDailyQuote } from '../hooks/useDailyQuote';
 
+// ────────────────────────────────────────────────
+// Workout Templates Screen
+// Displays user-saved workout templates with options to use or delete
+// ────────────────────────────────────────────────
+
 export const WorkoutTemplatesScreen = ({ navigation }: any) => {
   const { user } = useAuth();
-  const quote = useDailyQuote();
+  const quote = useDailyQuote(); // motivational quote shown at bottom
+
   const [templates, setTemplates] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => { loadTemplates(); }, []);
+  // Load templates once on mount
+  useEffect(() => {
+    loadTemplates();
+  }, []);
 
+  /**
+   * Fetches all saved workout templates for the current user
+   */
   const loadTemplates = async () => {
     try {
       setLoading(true);
       if (!user?.id) return;
+
       const data = await workoutAPI.getTemplates(user.id);
       setTemplates(data);
-    } catch {
+    } catch (err) {
       Alert.alert('Error', 'Failed to load templates');
     } finally {
       setLoading(false);
     }
   };
 
+  /**
+   * Confirms and starts a new workout session from the selected template
+   */
   const handleUseTemplate = async (templateId: string, templateName: string) => {
     Alert.alert('Use Template', `Start a workout using "${templateName}"?`, [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Start Workout', onPress: async () => {
+        text: 'Start Workout',
+        onPress: async () => {
           try {
             const workout = await workoutAPI.createFromTemplate(templateId);
-            navigation.navigate('ExerciseProgress', { workout, onComplete: () => loadTemplates() });
+            navigation.navigate('ExerciseProgress', {
+              workout,
+              onComplete: () => loadTemplates(), // refresh list after completion
+            });
           } catch {
             Alert.alert('Error', 'Failed to create workout from template');
           }
-        }
-      }
+        },
+      },
     ]);
   };
 
+  /**
+   * Confirms and permanently deletes the selected template
+   */
   const handleDeleteTemplate = async (templateId: string, templateName: string) => {
-    Alert.alert('Delete Template', `Delete "${templateName}"? This cannot be undone.`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive', onPress: async () => {
-          try {
-            await workoutAPI.deleteTemplate(templateId);
-            loadTemplates();
-          } catch {
-            Alert.alert('Error', 'Failed to delete template');
-          }
-        }
-      }
-    ]);
+    Alert.alert(
+      'Delete Template',
+      `Delete "${templateName}"? This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await workoutAPI.deleteTemplate(templateId);
+              loadTemplates(); // refresh list
+            } catch {
+              Alert.alert('Error', 'Failed to delete template');
+            }
+          },
+        },
+      ]
+    );
   };
 
   if (loading) {
@@ -78,8 +115,7 @@ export const WorkoutTemplatesScreen = ({ navigation }: any) => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-
-        {/* Info Card */}
+        {/* Quick explanation card */}
         <View style={styles.infoCard}>
           <Text style={styles.infoIcon}>💡</Text>
           <View style={{ flex: 1 }}>
@@ -90,7 +126,7 @@ export const WorkoutTemplatesScreen = ({ navigation }: any) => {
           </View>
         </View>
 
-        {/* Empty State */}
+        {/* No templates → empty state with call-to-action */}
         {templates.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyEmoji}>📋</Text>
@@ -106,14 +142,24 @@ export const WorkoutTemplatesScreen = ({ navigation }: any) => {
             </TouchableOpacity>
           </View>
         ) : (
+          /* List of saved templates */
           templates.map((template, idx) => {
-            const totalSets = template.exercises.reduce((t: number, ex: any) => t + ex.sets.length, 0);
+            // Calculate total number of sets across all exercises
+            const totalSets = template.exercises.reduce(
+              (t: number, ex: any) => t + ex.sets.length,
+              0
+            );
+
+            // Cycle through accent colors for visual distinction
             const colors = ['#4A9EFF', '#4ECDC4', '#7B6FFF', '#FF9F43', '#26de81', '#FF6B6B'];
             const accent = colors[idx % colors.length];
 
             return (
-              <View key={template._id} style={[styles.templateCard, { borderTopColor: accent }]}>
-                {/* Header */}
+              <View
+                key={template._id}
+                style={[styles.templateCard, { borderTopColor: accent }]}
+              >
+                {/* Template header with name, icon, stats */}
                 <View style={styles.templateHeader}>
                   <View style={[styles.templateIconBadge, { backgroundColor: accent + '22' }]}>
                     <Text style={styles.templateEmoji}>💪</Text>
@@ -132,7 +178,7 @@ export const WorkoutTemplatesScreen = ({ navigation }: any) => {
                   </View>
                 </View>
 
-                {/* Exercises Preview */}
+                {/* Preview of first 3 exercises */}
                 <View style={styles.exercisesList}>
                   {template.exercises.slice(0, 3).map((exercise: any, i: number) => (
                     <View key={i} style={styles.exerciseRow}>
@@ -145,12 +191,13 @@ export const WorkoutTemplatesScreen = ({ navigation }: any) => {
                   ))}
                   {template.exercises.length > 3 && (
                     <Text style={styles.moreText}>
-                      +{template.exercises.length - 3} more exercise{template.exercises.length - 3 !== 1 ? 's' : ''}
+                      +{template.exercises.length - 3} more exercise
+                      {template.exercises.length - 3 !== 1 ? 's' : ''}
                     </Text>
                   )}
                 </View>
 
-                {/* Actions */}
+                {/* Primary actions: Use or Delete */}
                 <View style={styles.actions}>
                   <TouchableOpacity
                     style={[styles.useBtn, { backgroundColor: accent }]}
@@ -170,27 +217,35 @@ export const WorkoutTemplatesScreen = ({ navigation }: any) => {
           })
         )}
 
-         {/* Faith Card */}
-                <View style={styles.faithCard}>
-                  <Text style={styles.faithIcon}>🙏</Text>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.faithText}>"{quote.text}"</Text>
-                    <Text style={styles.faithRef}>— {quote.author}</Text>
-                  </View>
-                </View>
+        {/* Motivational / faith-based quote at bottom */}
+        <View style={styles.faithCard}>
+          <Text style={styles.faithIcon}>🙏</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.faithText}>"{quote.text}"</Text>
+            <Text style={styles.faithRef}>— {quote.author}</Text>
+          </View>
+        </View>
 
-                <View style={{ height: 40 }} />
-              </ScrollView>
-            </View>
-          );
-        };
+        <View style={{ height: 40 }} />
+      </ScrollView>
+    </View>
+  );
+};
+
+// ────────────────────────────────────────────────
+// Styles
+// ────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a1628' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#0a1628' },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#0a1628',
+  },
   loadingText: { color: '#8ab4f8', marginTop: 12 },
-
-  header: {
+header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingTop: 56, paddingBottom: 16, paddingHorizontal: 20,
     backgroundColor: '#0d1f3c', borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
@@ -269,5 +324,7 @@ const styles = StyleSheet.create({
   },
   faithIcon: { fontSize: 28, marginRight: 14 },
   faithText: { color: '#c8d8f0', fontSize: 13, fontStyle: 'italic', lineHeight: 20, marginBottom: 6 },
-  faithRef: { color: '#4A9EFF', fontSize: 12, fontWeight: '600', textAlign: 'right' },
+  faithRef: { color: '#4A9EFF', fontSize: 12, fontWeight: '600', textAlign: 'right' }
 });
+
+export default WorkoutTemplatesScreen;

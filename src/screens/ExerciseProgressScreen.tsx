@@ -2,18 +2,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, TextInput, Modal } from 'react-native';
 import { workoutAPI } from '../services/api';
 
-// ── Rest Timer ────────────────────────────────────────────────────────────────
+// ── Rest Timer Component ──────────────────────────────────────────────────────
+
+// Preset rest durations in seconds
 const REST_OPTIONS = [30, 60, 90, 120, 180];
 
 const RestTimer = ({ visible, onClose }: { visible: boolean; onClose: () => void }) => {
-  const [selected, setSelected] = useState(60);
-  const [timeLeft, setTimeLeft] = useState<number | null>(null);
-  const intervalRef = useRef<any>(null);
+  const [selected, setSelected] = useState(60);          // currently highlighted preset
+  const [timeLeft, setTimeLeft] = useState<number | null>(null); // null = timer not started
+  const intervalRef = useRef<any>(null);                  // ref holds the setInterval ID for cleanup
 
+  // Starts the countdown from the given number of seconds
   const start = (seconds: number) => {
     setSelected(seconds);
     setTimeLeft(seconds);
-    clearInterval(intervalRef.current);
+    clearInterval(intervalRef.current); // clear any previous timer before starting a new one
     intervalRef.current = setInterval(() => {
       setTimeLeft(prev => {
         if (prev === null || prev <= 1) { clearInterval(intervalRef.current); return 0; }
@@ -22,31 +25,39 @@ const RestTimer = ({ visible, onClose }: { visible: boolean; onClose: () => void
     }, 1000);
   };
 
+  // Stops the countdown and resets timeLeft to null (idle state)
   const stop = () => { clearInterval(intervalRef.current); setTimeLeft(null); };
 
+  // Stop and clean up when modal is closed
   useEffect(() => {
     if (!visible) stop();
     return () => clearInterval(intervalRef.current);
   }, [visible]);
 
+  // Formats seconds as M:SS (e.g. 90 → "1:30")
   const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
   const isRunning = timeLeft !== null && timeLeft > 0;
-  const isDone = timeLeft === 0;
+  const isDone    = timeLeft === 0;
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      {/* Tapping the dark overlay closes the modal */}
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
         <TouchableOpacity style={styles.sheet} activeOpacity={1}>
           <View style={styles.handle} />
           <Text style={styles.sheetTitle}>REST TIMER</Text>
 
+          {/* Circular countdown display — turns green when done */}
           <View style={[styles.timerCircle, isDone && styles.timerCircleDone]}>
             <Text style={[styles.timerCountdown, isDone && { color: '#26de81' }]}>
+              {/* Show live countdown if running, otherwise show selected preset time */}
               {timeLeft !== null ? fmt(timeLeft) : fmt(selected)}
             </Text>
             {isDone && <Text style={styles.timerDoneLabel}>Done! 🏁</Text>}
           </View>
 
+          {/* Preset duration buttons — disabled while timer is running */}
           <View style={styles.presets}>
             {REST_OPTIONS.map(s => (
               <TouchableOpacity
@@ -61,6 +72,7 @@ const RestTimer = ({ visible, onClose }: { visible: boolean; onClose: () => void
             ))}
           </View>
 
+          {/* Start / Stop toggle button */}
           <View style={styles.sheetControls}>
             {isRunning
               ? <TouchableOpacity style={styles.stopBtn} onPress={stop}>
@@ -80,26 +92,35 @@ const RestTimer = ({ visible, onClose }: { visible: boolean; onClose: () => void
   );
 };
 
-// ── Edit Set Modal ────────────────────────────────────────────────────────────
+// ── Edit Set Modal Component ──────────────────────────────────────────────────
+
 const EditSetModal = ({ visible, set, setIndex, exerciseName, onSave, onClose }: {
-  visible: boolean; set: any; setIndex: number;
-  exerciseName: string; onSave: (r: number, w: number) => void; onClose: () => void;
+  visible: boolean;
+  set: any;
+  setIndex: number;
+  exerciseName: string;
+  onSave: (r: number, w: number) => void;
+  onClose: () => void;
 }) => {
-  const [reps, setReps] = useState('');
+  const [reps, setReps]     = useState('');
   const [weight, setWeight] = useState('');
 
+  // Pre-fill inputs with the current set values when the modal opens
   useEffect(() => {
     if (set) { setReps(String(set.reps)); setWeight(String(set.weight)); }
   }, [set]);
 
+  // Increments or decrements a string number value, clamped at 0
+  // decimals=true uses 2.5kg steps for weight; false uses 1-rep steps
   const adj = (val: string, delta: number, decimals = false) => {
     const n = decimals ? parseFloat(val || '0') : parseInt(val || '0');
     const result = Math.max(0, n + delta);
-    return decimals ? String(result) : String(result);
+    return String(result);
   };
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      {/* Tapping the overlay dismisses without saving */}
       <TouchableOpacity style={styles.overlay} activeOpacity={1} onPress={onClose}>
         <TouchableOpacity style={styles.sheet} activeOpacity={1}>
           <View style={styles.handle} />
@@ -107,7 +128,7 @@ const EditSetModal = ({ visible, set, setIndex, exerciseName, onSave, onClose }:
           <Text style={styles.editSubtitle}>{exerciseName}</Text>
 
           <View style={styles.editRow}>
-            {/* Reps */}
+            {/* Reps spinner: increments by 1 */}
             <View style={styles.editField}>
               <Text style={styles.editLabel}>REPS</Text>
               <View style={styles.spinnerRow}>
@@ -127,7 +148,7 @@ const EditSetModal = ({ visible, set, setIndex, exerciseName, onSave, onClose }:
               </View>
             </View>
 
-            {/* Weight */}
+            {/* Weight spinner: increments by 2.5kg */}
             <View style={styles.editField}>
               <Text style={styles.editLabel}>WEIGHT (kg)</Text>
               <View style={styles.spinnerRow}>
@@ -148,6 +169,7 @@ const EditSetModal = ({ visible, set, setIndex, exerciseName, onSave, onClose }:
             </View>
           </View>
 
+          {/* Passes parsed numbers back to parent; defaults to 0 if input is invalid */}
           <TouchableOpacity
             style={styles.saveBtn}
             onPress={() => onSave(parseInt(reps) || 0, parseFloat(weight) || 0)}
@@ -164,21 +186,28 @@ const EditSetModal = ({ visible, set, setIndex, exerciseName, onSave, onClose }:
 };
 
 // ── Main Screen ───────────────────────────────────────────────────────────────
+
 export const ExerciseProgressScreen = ({ route, navigation }: any) => {
   const { workout } = route.params || {};
+
+  // Local copy of workout so set completions and edits update the UI immediately
   const [currentWorkout, setCurrentWorkout] = useState(workout);
-  const [timerVisible, setTimerVisible] = useState(false);
-  const [editVisible, setEditVisible] = useState(false);
+  const [timerVisible, setTimerVisible]     = useState(false);
+  const [editVisible, setEditVisible]       = useState(false);
+  // Tracks which exercise and set is being edited (used to pass correct data to EditSetModal)
   const [editTarget, setEditTarget] = useState<{ exIdx: number; setIdx: number } | null>(null);
 
+  // Guard: if workout data is missing, bail out immediately
   useEffect(() => {
     if (!workout) { Alert.alert('Error', 'No workout data found'); navigation.goBack(); }
   }, []);
 
+  // Toggles a set's completed state both in the API and in local state
   const handleSetComplete = async (exIdx: number, setIdx: number) => {
     try {
       const wasCompleted = currentWorkout.exercises[exIdx].sets[setIdx].completed;
       await workoutAPI.updateSet(currentWorkout._id, exIdx, setIdx, !wasCompleted);
+      // Spread to create a new object reference so React re-renders
       const updated = { ...currentWorkout };
       updated.exercises[exIdx].sets[setIdx].completed = !wasCompleted;
       setCurrentWorkout({ ...updated });
@@ -187,16 +216,18 @@ export const ExerciseProgressScreen = ({ route, navigation }: any) => {
     }
   };
 
+  // Applies reps/weight edits from EditSetModal to local state (no API call — saved on completion)
   const handleEditSave = (reps: number, weight: number) => {
     if (!editTarget) return;
     const updated = { ...currentWorkout };
-    updated.exercises[editTarget.exIdx].sets[editTarget.setIdx].reps = reps;
+    updated.exercises[editTarget.exIdx].sets[editTarget.setIdx].reps   = reps;
     updated.exercises[editTarget.exIdx].sets[editTarget.setIdx].weight = weight;
     setCurrentWorkout({ ...updated });
     setEditVisible(false);
     setEditTarget(null);
   };
 
+  // Checks if all sets are done; warns the user if not, then navigates to the complete screen
   const handleComplete = () => {
     const allDone = currentWorkout.exercises.every((ex: any) => ex.sets.every((s: any) => s.completed));
     if (!allDone) {
@@ -213,62 +244,77 @@ export const ExerciseProgressScreen = ({ route, navigation }: any) => {
     navigation.navigate('CompleteWorkout', { workout: currentWorkout });
   };
 
-  const totalSets = currentWorkout?.exercises?.reduce((t: number, ex: any) => t + ex.sets.length, 0) || 0;
+  // Progress calculations for the header bar
+  const totalSets     = currentWorkout?.exercises?.reduce((t: number, ex: any) => t + ex.sets.length, 0) || 0;
   const completedSets = currentWorkout?.exercises?.reduce((t: number, ex: any) =>
     t + ex.sets.filter((s: any) => s.completed).length, 0) || 0;
-  const progressPct = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
+  const progressPct   = totalSets > 0 ? Math.round((completedSets / totalSets) * 100) : 0;
 
   if (!currentWorkout) return null;
 
   return (
     <View style={styles.container}>
+
+      {/* ── Header: Back / Workout Title ── */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.title} numberOfLines={1}>{currentWorkout.title}</Text>
+        {/* Spacer keeps the title centred */}
         <View style={{ width: 60 }} />
       </View>
 
+      {/* ── Progress Bar Header ── */}
       <View style={styles.progressHeader}>
         <View style={styles.progressInfo}>
           <Text style={styles.progressLabel}>PROGRESS</Text>
           <Text style={styles.progressPct}>{progressPct}%</Text>
         </View>
         <Text style={styles.setsCount}>{completedSets} / {totalSets} sets</Text>
+        {/* Filled portion width is set dynamically as a percentage string */}
         <View style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${progressPct}%` as any }]} />
         </View>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+
+        {/* ── Exercise Cards ── */}
         {currentWorkout.exercises.map((exercise: any, exIdx: number) => {
           const exCompleted = exercise.sets.filter((s: any) => s.completed).length;
-          const allDone = exCompleted === exercise.sets.length;
+          const allDone     = exCompleted === exercise.sets.length; // true when every set is ticked
 
           return (
+            // Card border turns green when all sets for this exercise are completed
             <View key={exIdx} style={[styles.exerciseCard, allDone && styles.exerciseCardDone]}>
               <View style={styles.exerciseHeader}>
                 <Text style={styles.exerciseName}>{exercise.name}</Text>
+                {/* Badge shows "X/Y sets" — background turns green when complete */}
                 <View style={[styles.exerciseBadge, allDone && styles.exerciseBadgeDone]}>
                   <Text style={styles.exerciseBadgeText}>{exCompleted}/{exercise.sets.length}</Text>
                 </View>
               </View>
 
+              {/* ── Set Rows ── */}
               {exercise.sets.map((set: any, setIdx: number) => (
+                // Row background turns dark green when the set is marked complete
                 <View key={setIdx} style={[styles.setRow, set.completed && styles.setRowDone]}>
+                  {/* Tapping the left side also toggles completion */}
                   <TouchableOpacity style={styles.setLeft} onPress={() => handleSetComplete(exIdx, setIdx)} activeOpacity={0.7}>
                     <Text style={[styles.setNumber, set.completed && styles.setTextDone]}>Set {setIdx + 1}</Text>
                     <Text style={[styles.setDetails, set.completed && styles.setTextDone]}>
                       {set.reps} reps{set.weight > 0 ? ` @ ${set.weight}kg` : ''}
                     </Text>
                   </TouchableOpacity>
+                  {/* Three-dot button opens the inline edit modal for this set */}
                   <TouchableOpacity
                     style={styles.editIconBtn}
                     onPress={() => { setEditTarget({ exIdx, setIdx }); setEditVisible(true); }}
                   >
                     <Text style={styles.editIconText}>···</Text>
                   </TouchableOpacity>
+                  {/* Checkbox toggles set completion */}
                   <TouchableOpacity
                     style={[styles.checkbox, set.completed && styles.checkboxDone]}
                     onPress={() => handleSetComplete(exIdx, setIdx)}
@@ -278,7 +324,7 @@ export const ExerciseProgressScreen = ({ route, navigation }: any) => {
                 </View>
               ))}
 
-              {/* Rest timer trigger after last set */}
+              {/* Rest timer button shown below the last set of each exercise */}
               <TouchableOpacity style={styles.restInlineBtn} onPress={() => setTimerVisible(true)}>
                 <Text style={styles.restInlineIcon}>🕐</Text>
                 <Text style={styles.restInlineText}>Start Rest Timer</Text>
@@ -287,7 +333,7 @@ export const ExerciseProgressScreen = ({ route, navigation }: any) => {
           );
         })}
 
-        {/* Complete */}
+        {/* ── Complete Workout Button — turns green when 100% done ── */}
         <TouchableOpacity
           style={[styles.completeBtn, progressPct === 100 && styles.completeBtnReady]}
           onPress={handleComplete}
@@ -300,9 +346,11 @@ export const ExerciseProgressScreen = ({ route, navigation }: any) => {
         <View style={{ height: 40 }} />
       </ScrollView>
 
+      {/* ── Modals ── */}
       <RestTimer visible={timerVisible} onClose={() => setTimerVisible(false)} />
       <EditSetModal
         visible={editVisible}
+        // Safely reads the set data for whichever set is being edited
         set={editTarget ? currentWorkout.exercises[editTarget.exIdx]?.sets[editTarget.setIdx] : null}
         setIndex={editTarget?.setIdx ?? 0}
         exerciseName={editTarget ? currentWorkout.exercises[editTarget.exIdx]?.name : ''}
@@ -325,6 +373,7 @@ const styles = StyleSheet.create({
   backText: { color: '#4A9EFF', fontSize: 16, fontWeight: '600' },
   title: { color: '#fff', fontSize: 18, fontWeight: '800', flex: 1, textAlign: 'center' },
 
+  // Progress bar section below the header
   progressHeader: { backgroundColor: '#0d1f3c', padding: 16, borderBottomWidth: 1, borderBottomColor: '#1a3a6b' },
   progressInfo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
   progressLabel: { color: '#5a7fa8', fontSize: 11, fontWeight: '700', letterSpacing: 2 },
@@ -335,6 +384,7 @@ const styles = StyleSheet.create({
 
   content: { padding: 16 },
 
+  // Exercise card
   exerciseCard: {
     backgroundColor: '#0d1f3c', borderRadius: 16, padding: 16,
     marginBottom: 14, borderTopWidth: 3, borderTopColor: '#1a3a6b', elevation: 4,
@@ -346,6 +396,7 @@ const styles = StyleSheet.create({
   exerciseBadgeDone: { backgroundColor: '#26de81' },
   exerciseBadgeText: { color: '#fff', fontSize: 12, fontWeight: '700' },
 
+  // Set row
   setRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#0a1628', borderRadius: 10,
@@ -362,6 +413,7 @@ const styles = StyleSheet.create({
   checkboxDone: { backgroundColor: '#26de81', borderColor: '#26de81' },
   checkmark: { color: '#fff', fontSize: 15, fontWeight: '800' },
 
+  // Rest timer trigger (below each exercise's sets)
   restInlineBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     marginTop: 6, paddingVertical: 8, gap: 6,
@@ -374,7 +426,7 @@ const styles = StyleSheet.create({
   completeBtnReady: { backgroundColor: '#26de81' },
   completeBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
 
-  // ── Shared Modal ──
+  // Shared bottom sheet modal styles
   overlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.65)', justifyContent: 'flex-end' },
   sheet: { backgroundColor: '#0d1f3c', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 24, paddingBottom: 44 },
   handle: { width: 40, height: 4, backgroundColor: '#1a3a6b', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
@@ -387,7 +439,7 @@ const styles = StyleSheet.create({
   dismissBtn: { padding: 14, alignItems: 'center' },
   dismissText: { color: '#5a7fa8', fontSize: 15, fontWeight: '600' },
 
-  // ── Timer ──
+  // Rest timer circle
   timerCircle: {
     width: 140, height: 140, borderRadius: 70, borderWidth: 4, borderColor: '#7B6FFF',
     alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginBottom: 20,
@@ -401,7 +453,7 @@ const styles = StyleSheet.create({
   presetText: { color: '#5a7fa8', fontSize: 13, fontWeight: '700' },
   presetTextActive: { color: '#fff' },
 
-  // ── Edit ──
+  // Edit set modal
   editSubtitle: { color: '#8ab4f8', fontSize: 13, textAlign: 'center', marginBottom: 20, marginTop: -12 },
   editRow: { flexDirection: 'row', gap: 16, marginBottom: 20 },
   editField: { flex: 1 },

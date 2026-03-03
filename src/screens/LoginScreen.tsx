@@ -7,8 +7,10 @@ import { colors, spacing, borderRadius } from '../theme/colors';
 import { authAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
+// Max consecutive failed logins before the form is locked
 const MAX_ATTEMPTS = 3;
 
+// Password validation rules — each has a label shown in the live checklist
 const PASSWORD_RULES = [
   { label: 'At least 9 characters',          test: (p: string) => p.length >= 9 },
   { label: 'One uppercase letter',            test: (p: string) => /[A-Z]/.test(p) },
@@ -16,40 +18,49 @@ const PASSWORD_RULES = [
   { label: 'One special character (!@#$etc)', test: (p: string) => /[^A-Za-z0-9]/.test(p) },
 ];
 
+// Returns true only if all password rules pass
 const validatePassword = (p: string) => PASSWORD_RULES.every(r => r.test(p));
 
 export const LoginScreen = ({ navigation }: any) => {
-  const { login: saveAuth } = useAuth();
+  const { login: saveAuth } = useAuth(); // saves token + user to auth context after login
   const scrollRef = useRef<ScrollView>(null);
+
+  // Toggles between Login and Sign Up views
   const [isSignUp, setIsSignUp] = useState(false);
 
-  const [email, setEmail] = useState('');
+  // ── Form field state ──────────────────────────────────────────────────────
+  const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
-  const [surname, setSurname] = useState('');
-  const [username, setUsername] = useState('');
-  const [country, setCountry] = useState('');
-  const [mobile, setMobile] = useState('');
+  const [surname, setSurname]     = useState('');
+  const [username, setUsername]   = useState('');
+  const [country, setCountry]     = useState('');
+  const [mobile, setMobile]       = useState('');
 
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [passwordFocused, setPasswordFocused] = useState(false);
+  // ── UI state ──────────────────────────────────────────────────────────────
+  const [showPassword, setShowPassword]     = useState(false);
+  const [loading, setLoading]               = useState(false);
+  const [passwordFocused, setPasswordFocused] = useState(false); // triggers live rule checklist
 
+  // ── Login error / lockout state ───────────────────────────────────────────
   const [loginError, setLoginError] = useState('');
-  const [attempts, setAttempts] = useState(0);
-  const [locked, setLocked] = useState(false);
+  const [attempts, setAttempts]     = useState(0);   // tracks consecutive failed login attempts
+  const [locked, setLocked]         = useState(false); // locks form after MAX_ATTEMPTS failures
 
+  // ── Forgot password modal state ───────────────────────────────────────────
   const [forgotVisible, setForgotVisible] = useState(false);
-  const [resetEmail, setResetEmail] = useState('');
-  const [resetSent, setResetSent] = useState(false);
-  const [resetLoading, setResetLoading] = useState(false);
+  const [resetEmail, setResetEmail]       = useState('');
+  const [resetSent, setResetSent]         = useState(false);   // shows success message after sending
+  const [resetLoading, setResetLoading]   = useState(false);
 
+  // Clears all form fields and resets error/lockout state (used when switching modes)
   const resetFields = () => {
     setEmail(''); setPassword(''); setFirstName(''); setSurname('');
     setUsername(''); setCountry(''); setMobile('');
     setLoginError(''); setAttempts(0); setLocked(false);
   };
 
+  // Submits login credentials; increments attempt counter on failure and locks after MAX_ATTEMPTS
   const handleLogin = async () => {
     if (locked) return;
     if (!email || !password) { setLoginError('Please enter your email and password.'); return; }
@@ -59,7 +70,7 @@ export const LoginScreen = ({ navigation }: any) => {
       const data = await authAPI.login(email, password);
       if (data?.token && data?.user) {
         setAttempts(0);
-        await saveAuth(data.token, data.user);
+        await saveAuth(data.token, data.user); // persists auth and navigates away
       } else {
         setLoginError('Server response was incomplete.');
       }
@@ -78,6 +89,7 @@ export const LoginScreen = ({ navigation }: any) => {
     }
   };
 
+  // Validates required fields and password strength before registering a new account
   const handleSignUp = async () => {
     if (!firstName || !surname || !email || !username || !password || !country) {
       Alert.alert('Error', 'Please fill in all required fields');
@@ -91,7 +103,7 @@ export const LoginScreen = ({ navigation }: any) => {
     try {
       await authAPI.register(email, username, password, firstName, surname, country, mobile);
       Alert.alert('Success', 'Account created! Please log in.');
-      setIsSignUp(false);
+      setIsSignUp(false); // switch back to login view
       resetFields();
     } catch (err: any) {
       Alert.alert('Error', err?.error || err?.message || 'Registration failed');
@@ -100,19 +112,21 @@ export const LoginScreen = ({ navigation }: any) => {
     }
   };
 
+  // Sends a password reset email — always shows success to avoid revealing whether the email exists
   const handleForgotPassword = async () => {
     if (!resetEmail) { Alert.alert('Error', 'Please enter your email address.'); return; }
     setResetLoading(true);
     try {
       await authAPI.forgotPassword(resetEmail);
     } catch (_) {
-      // Fail silently — don't reveal whether email exists
+      // Fail silently — don't reveal whether the email address is registered
     } finally {
       setResetLoading(false);
-      setResetSent(true);
+      setResetSent(true); // always show the success message
     }
   };
 
+  // Show live password rule checklist only during sign up when password field is active or has content
   const showRules = isSignUp && (passwordFocused || password.length > 0);
 
   return (
@@ -123,12 +137,15 @@ export const LoginScreen = ({ navigation }: any) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* ── App Logo + Tagline ── */}
         <View style={styles.header}>
           <Image source={require('../../assets/mainlogo.png')} style={styles.logo} resizeMode="cover" />
           <Text style={styles.tagline}>One Hub. Infinite Possibilities.</Text>
         </View>
 
         <View style={styles.form}>
+
+          {/* ── Sign Up Only: First Name + Surname (side by side) ── */}
           {isSignUp && (
             <View style={styles.row}>
               <TextInput
@@ -152,6 +169,7 @@ export const LoginScreen = ({ navigation }: any) => {
             </View>
           )}
 
+          {/* Email — clears error on change; disabled when locked out */}
           <TextInput
             style={styles.input}
             placeholder="Email *"
@@ -163,6 +181,7 @@ export const LoginScreen = ({ navigation }: any) => {
             editable={!loading && !locked}
           />
 
+          {/* ── Sign Up Only: Username ── */}
           {isSignUp && (
             <TextInput
               style={styles.input}
@@ -175,6 +194,7 @@ export const LoginScreen = ({ navigation }: any) => {
             />
           )}
 
+          {/* Password with show/hide toggle — locked state dims the row */}
           <View style={[styles.passwordRow, locked && styles.inputLocked]}>
             <TextInput
               style={styles.passwordInput}
@@ -192,6 +212,7 @@ export const LoginScreen = ({ navigation }: any) => {
             </TouchableOpacity>
           </View>
 
+          {/* Login error / lockout message */}
           {!!loginError && (
             <View style={styles.errorBox}>
               <Text style={styles.errorIcon}>⚠️</Text>
@@ -199,12 +220,14 @@ export const LoginScreen = ({ navigation }: any) => {
             </View>
           )}
 
+          {/* Live password rule checklist — shown in sign up mode when typing */}
           {showRules && (
             <View style={styles.rulesCard}>
               {PASSWORD_RULES.map((rule, i) => {
                 const passed = rule.test(password);
                 return (
                   <View key={i} style={styles.ruleRow}>
+                    {/* Green tick when rule passes, grey circle when not */}
                     <Text style={[styles.ruleIcon, passed && styles.ruleIconPass]}>{passed ? '✓' : '○'}</Text>
                     <Text style={[styles.ruleText, passed && styles.ruleTextPass]}>{rule.label}</Text>
                   </View>
@@ -213,8 +236,10 @@ export const LoginScreen = ({ navigation }: any) => {
             </View>
           )}
 
+          {/* ── Sign Up Only: Country + Mobile + required note ── */}
           {isSignUp && (
             <>
+              {/* Scrolls to end after focus so the input isn't hidden by the keyboard */}
               <TextInput
                 style={styles.input}
                 placeholder="Country *"
@@ -239,6 +264,7 @@ export const LoginScreen = ({ navigation }: any) => {
             </>
           )}
 
+          {/* Primary action button — Log In or Sign Up depending on mode */}
           <TouchableOpacity
             style={[styles.button, (loading || locked) && styles.buttonDisabled]}
             onPress={isSignUp ? handleSignUp : handleLogin}
@@ -250,6 +276,7 @@ export const LoginScreen = ({ navigation }: any) => {
             }
           </TouchableOpacity>
 
+          {/* Forgot password link — only shown on login view */}
           {!isSignUp && (
             <TouchableOpacity
               onPress={() => { setForgotVisible(true); setResetSent(false); setResetEmail(''); }}
@@ -259,6 +286,7 @@ export const LoginScreen = ({ navigation }: any) => {
             </TouchableOpacity>
           )}
 
+          {/* Toggle between Login and Sign Up */}
           <TouchableOpacity onPress={() => { setIsSignUp(!isSignUp); resetFields(); }} disabled={loading}>
             <Text style={styles.switchText}>
               {isSignUp ? 'Already have an account? Log In' : "Don't have an account? Sign Up"}
@@ -267,12 +295,15 @@ export const LoginScreen = ({ navigation }: any) => {
         </View>
       </ScrollView>
 
+      {/* ── Forgot Password Bottom Sheet Modal ── */}
       <Modal visible={forgotVisible} transparent animationType="slide" onRequestClose={() => setForgotVisible(false)}>
+        {/* Tapping outside the sheet dismisses it */}
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setForgotVisible(false)}>
           <TouchableOpacity style={styles.modalSheet} activeOpacity={1}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>RESET PASSWORD</Text>
 
+            {/* After sending: show confirmation message */}
             {resetSent ? (
               <>
                 <Text style={styles.resetSuccessIcon}>📧</Text>
@@ -284,6 +315,7 @@ export const LoginScreen = ({ navigation }: any) => {
                 </TouchableOpacity>
               </>
             ) : (
+              /* Before sending: show email input and send button */
               <>
                 <Text style={styles.resetHint}>Enter your email and we'll send you a reset link.</Text>
                 <TextInput
@@ -339,6 +371,8 @@ const styles = StyleSheet.create({
   passwordInput: { flex: 1, padding: spacing.md, fontSize: 16, color: colors.text.primary },
   eyeBtn: { paddingHorizontal: 14 },
   eyeIcon: { fontSize: 18 },
+
+  // Error / lockout message box
   errorBox: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#FF6B6B22', borderRadius: 10,
@@ -347,6 +381,8 @@ const styles = StyleSheet.create({
   },
   errorIcon: { fontSize: 16 },
   errorText: { flex: 1, color: '#FF6B6B', fontSize: 13, fontWeight: '600' },
+
+  // Live password rule checklist
   rulesCard: {
     backgroundColor: '#0d1f3c', borderRadius: 12,
     padding: 14, marginBottom: spacing.md,
@@ -357,7 +393,9 @@ const styles = StyleSheet.create({
   ruleIconPass: { color: '#26de81' },
   ruleText: { color: '#5a7fa8', fontSize: 13 },
   ruleTextPass: { color: '#26de81' },
+
   requiredNote: { color: '#5a7fa8', fontSize: 12, marginBottom: spacing.md, marginTop: -8 },
+
   button: {
     backgroundColor: colors.accent.blue, borderRadius: borderRadius.small,
     padding: spacing.md, alignItems: 'center', marginTop: spacing.sm,
@@ -367,6 +405,8 @@ const styles = StyleSheet.create({
   buttonText: { color: colors.text.white, fontSize: 16, fontWeight: 'bold' },
   forgotText: { color: '#8ab4f8', textAlign: 'center', marginTop: spacing.md, fontSize: 14 },
   switchText: { color: colors.text.white, textAlign: 'center', marginTop: spacing.sm, fontSize: 14 },
+
+  // Forgot password bottom sheet modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalSheet: {
     backgroundColor: colors.primary.dark, borderTopLeftRadius: 24, borderTopRightRadius: 24,

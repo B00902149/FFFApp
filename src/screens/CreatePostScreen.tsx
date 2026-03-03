@@ -4,32 +4,36 @@ import { useAuth } from '../context/AuthContext';
 import { postsAPI } from '../services/api';
 import { useDailyQuote } from '../hooks/useDailyQuote';
 
+// Available post categories with display icon and accent colour
 const CATEGORIES = [
-  { name: 'Help Request', icon: '🆘', color: '#7B6FFF' },
-  { name: 'Testimony',    icon: '✨', color: '#FFD700' },
-  { name: 'Encouragement',icon: '💪', color: '#26de81' },
-  { name: 'Victory',      icon: '🎉', color: '#FF9F43' },
+  { name: 'Help Request',  icon: '🆘', color: '#7B6FFF' },
+  { name: 'Testimony',     icon: '✨', color: '#FFD700' },
+  { name: 'Encouragement', icon: '💪', color: '#26de81' },
+  { name: 'Victory',       icon: '🎉', color: '#FF9F43' },
 ];
 
 export const CreatePostScreen = ({ route, navigation }: any) => {
   const { user } = useAuth();
-  const { onPostCreated } = route.params || {};
-  const quote = useDailyQuote();
+  const { onPostCreated } = route.params || {}; // callback to prepend new post in the community feed
+  const quote = useDailyQuote();                // inspirational quote shown at the bottom
 
   const [selectedCategory, setSelectedCategory] = useState('');
-  const [content, setContent] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [content, setContent]                   = useState('');
+  const [loading, setLoading]                   = useState(false);
 
+  // Post button is only enabled when a category is chosen and content is non-empty
   const canPost = !loading && !!selectedCategory && !!content.trim();
 
+  // Validates inputs, submits the post to the API, then returns to the community feed
   const handleSubmit = async () => {
-    if (!selectedCategory) { Alert.alert('Select Category', 'Please choose a category for your post'); return; }
-    if (!content.trim())   { Alert.alert('Add Content', 'Please write something to share'); return; }
+    if (!selectedCategory)            { Alert.alert('Select Category', 'Please choose a category for your post'); return; }
+    if (!content.trim())              { Alert.alert('Add Content', 'Please write something to share'); return; }
     if (!user?.id || !user?.username) { Alert.alert('Error', 'User not logged in'); return; }
 
     setLoading(true);
     try {
       const newPost = await postsAPI.createPost(user.id, user.username, selectedCategory, content.trim());
+      // Pass the new post back to CommunityScreen so it appears at the top of the feed
       if (onPostCreated) onPostCreated(newPost);
       navigation.goBack();
     } catch {
@@ -42,12 +46,13 @@ export const CreatePostScreen = ({ route, navigation }: any) => {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
 
-      {/* Header */}
+      {/* ── Header: Cancel / Title / Post ── */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.cancelBtn}>Cancel</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Share with Community</Text>
+        {/* Shows a spinner while submitting, otherwise the Post button */}
         <TouchableOpacity onPress={handleSubmit} disabled={!canPost}>
           {loading
             ? <ActivityIndicator color="#4A9EFF" size="small" />
@@ -58,7 +63,7 @@ export const CreatePostScreen = ({ route, navigation }: any) => {
 
       <ScrollView style={styles.scroll} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
 
-        {/* Category Selection */}
+        {/* ── Category Selection Grid ── */}
         <Text style={styles.sectionLabel}>CHOOSE CATEGORY</Text>
         <View style={styles.categoryGrid}>
           {CATEGORIES.map(cat => {
@@ -68,15 +73,17 @@ export const CreatePostScreen = ({ route, navigation }: any) => {
                 key={cat.name}
                 style={[
                   styles.categoryCard,
-                  { borderColor: cat.color + '40' },
-                  isSelected && { borderColor: cat.color, backgroundColor: cat.color + '18' },
+                  { borderColor: cat.color + '40' },                               // subtle tinted border by default
+                  isSelected && { borderColor: cat.color, backgroundColor: cat.color + '18' }, // highlighted when selected
                 ]}
                 onPress={() => setSelectedCategory(cat.name)}
               >
                 <Text style={styles.categoryIcon}>{cat.icon}</Text>
+                {/* Category name turns to accent colour when selected */}
                 <Text style={[styles.categoryName, isSelected && { color: cat.color }]}>
                   {cat.name}
                 </Text>
+                {/* Small coloured dot indicator shown only on selected card */}
                 {isSelected && (
                   <View style={[styles.selectedDot, { backgroundColor: cat.color }]} />
                 )}
@@ -85,7 +92,7 @@ export const CreatePostScreen = ({ route, navigation }: any) => {
           })}
         </View>
 
-        {/* Content Input */}
+        {/* ── Post Content Input ── */}
         <Text style={styles.sectionLabel}>YOUR MESSAGE</Text>
         <View style={styles.inputCard}>
           <TextInput
@@ -98,12 +105,13 @@ export const CreatePostScreen = ({ route, navigation }: any) => {
             maxLength={1000}
             textAlignVertical="top"
           />
+          {/* Character counter turns red when nearing the 1000-char limit */}
           <Text style={[styles.charCount, content.length > 900 && { color: '#FF6B6B' }]}>
             {content.length}/1000
           </Text>
         </View>
 
-        {/* Daily Quote Card */}
+        {/* ── Daily Inspirational Quote ── */}
         <View style={styles.quoteCard}>
           <Text style={styles.quoteIcon}>💬</Text>
           <View style={{ flex: 1 }}>
@@ -138,7 +146,7 @@ const styles = StyleSheet.create({
     letterSpacing: 2, marginBottom: 12, marginTop: 8,
   },
 
-  // Categories
+  // Category grid (2-column wrap layout)
   categoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 24 },
   categoryCard: {
     width: '47%', aspectRatio: 1.5,
@@ -150,7 +158,7 @@ const styles = StyleSheet.create({
   categoryName: { color: '#8ab4f8', fontSize: 13, fontWeight: '700', textAlign: 'center' },
   selectedDot: { width: 6, height: 6, borderRadius: 3, marginTop: 6 },
 
-  // Input
+  // Post content input card
   inputCard: {
     backgroundColor: '#0d1f3c', borderRadius: 16,
     padding: 16, marginBottom: 16,
@@ -162,7 +170,7 @@ const styles = StyleSheet.create({
   },
   charCount: { color: '#2a4a7f', fontSize: 12, textAlign: 'right', marginTop: 8 },
 
-  // Quote
+  // Inspirational quote card
   quoteCard: {
     flexDirection: 'row', backgroundColor: '#0d1f3c',
     borderRadius: 16, padding: 18,

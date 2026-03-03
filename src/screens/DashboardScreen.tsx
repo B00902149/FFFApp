@@ -4,35 +4,41 @@ import { nutritionAPI, profileAPI } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { useDailyQuote } from '../hooks/useDailyQuote';
 
-
 export const DashboardScreen = ({ navigation }: any) => {
   const { user } = useAuth();
-  const quote = useDailyQuote();
+  const quote = useDailyQuote(); // pulls today's inspirational quote (cached per day)
+
   const [loading, setLoading] = useState(false);
+  // Aggregated stats shown in the Today's Summary card
   const [todaySummary, setTodaySummary] = useState({ workouts: 0, calories: 0, posts: 0 });
 
-
+  // Load summary data on first render
   useEffect(() => {
     loadTodaySummary();
   }, []);
 
+  // Fetches today's nutrition and overall profile stats in parallel
   const loadTodaySummary = async () => {
     try {
       if (!user?.id) return;
       setLoading(true);
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toISOString().split('T')[0]; // format: YYYY-MM-DD
+
+      // Run both API calls simultaneously to avoid sequential waiting
       const [nutritionData, statsData] = await Promise.all([
-        nutritionAPI.getNutrition(user.id, today).catch(() => null),
+        nutritionAPI.getNutrition(user.id, today).catch(() => null), // null if no log exists for today
         profileAPI.getStats(user.id).catch(() => null)
       ]);
+
       setTodaySummary({
         workouts: statsData?.workoutCount || 0,
         calories: nutritionData?.totalCalories || 0,
-        posts: statsData?.postCount || 0
+        posts:    statsData?.postCount || 0
       });
     } catch (error) {} finally { setLoading(false); }
   };
 
+  // Navigation tiles for the four main feature areas
   const tiles = [
     { id: 1, title: 'My Health',  icon: '❤️',  screen: 'Health',    color: '#FF6B6B' },
     { id: 2, title: 'Exercise',   icon: '💪',  screen: 'Exercise',  color: '#4ECDC4' },
@@ -40,6 +46,7 @@ export const DashboardScreen = ({ navigation }: any) => {
     { id: 4, title: 'Community',  icon: '👥',  screen: 'Community', color: '#4A9EFF' },
   ];
 
+  // Stats displayed in the Today's Summary card — each is tappable and navigates to its screen
   const summaryItems = [
     { value: todaySummary.workouts, label: 'Workouts', screen: 'Exercise',  color: '#4ECDC4' },
     { value: todaySummary.calories, label: 'Calories', screen: 'Nutrition', color: '#FF9F43' },
@@ -50,33 +57,37 @@ export const DashboardScreen = ({ navigation }: any) => {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Greeting */}
+        {/* ── Personalised Greeting ── */}
         <View style={styles.greeting}>
           <Text style={styles.greetingText}>Welcome back,</Text>
+          {/* Falls back to 'Athlete' if username isn't loaded yet */}
           <Text style={styles.greetingName}>{user?.username || 'Athlete'} 👋</Text>
         </View>
 
-        {/* Daily Verse */}
+        {/* ── Daily Quote Card ── */}
         <View style={styles.verseCard}>
           <Text style={styles.verseLabel}>💬  DAILY QUOTE</Text>
           <Text style={styles.verseText}>"{quote.text}"</Text>
           <Text style={styles.verseReference}>— {quote.author}</Text>
         </View>
 
-        {/* Today's Summary */}
+        {/* ── Today's Summary Card ── */}
         <View style={styles.summaryCard}>
           <View style={styles.summaryHeader}>
             <Text style={styles.summaryTitle}>TODAY'S SUMMARY</Text>
+            {/* Displays today's date in short format, e.g. "Mon 3 Mar" */}
             <Text style={styles.summaryDate}>
               {new Date().toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
             </Text>
           </View>
+          {/* Show spinner while data loads, then render the stats grid */}
           {loading ? (
             <ActivityIndicator size="small" color="#4A9EFF" style={{ paddingVertical: 16 }} />
           ) : (
             <View style={styles.summaryGrid}>
               {summaryItems.map((item, i) => (
                 <React.Fragment key={item.label}>
+                  {/* Each stat navigates to its related screen when tapped */}
                   <TouchableOpacity
                     style={styles.summaryItem}
                     onPress={() => navigation.navigate(item.screen)}
@@ -84,6 +95,7 @@ export const DashboardScreen = ({ navigation }: any) => {
                     <Text style={[styles.summaryValue, { color: item.color }]}>{item.value}</Text>
                     <Text style={styles.summaryLabel}>{item.label}</Text>
                   </TouchableOpacity>
+                  {/* Vertical divider between stats, skipped after the last item */}
                   {i < summaryItems.length - 1 && <View style={styles.summaryDivider} />}
                 </React.Fragment>
               ))}
@@ -91,12 +103,12 @@ export const DashboardScreen = ({ navigation }: any) => {
           )}
         </View>
 
-        {/* Main Tiles */}
+        {/* ── Main Feature Tiles (2-column grid) ── */}
         <View style={styles.grid}>
           {tiles.map((tile) => (
             <TouchableOpacity
               key={tile.id}
-              style={[styles.tile, { borderTopColor: tile.color }]}
+              style={[styles.tile, { borderTopColor: tile.color }]} // each tile has its own accent colour
               onPress={() => navigation.navigate(tile.screen)}
               activeOpacity={0.7}
             >
@@ -106,7 +118,7 @@ export const DashboardScreen = ({ navigation }: any) => {
           ))}
         </View>
 
-        {/* Progress Charts */}
+        {/* ── Progress Charts Banner ── */}
         <TouchableOpacity
           style={styles.progressCard}
           onPress={() => navigation.navigate('ProgressCharts')}
@@ -162,6 +174,7 @@ const styles = StyleSheet.create({
   summaryLabel: { color: '#5a7fa8', fontSize: 11, fontWeight: '700', letterSpacing: 1 },
   summaryDivider: { width: 1, height: 40, backgroundColor: '#1a3a6b' },
 
+  // 2-column tile grid
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginBottom: 14 },
   tile: {
     width: '48%',
@@ -178,6 +191,7 @@ const styles = StyleSheet.create({
   tileIcon: { fontSize: 36, marginBottom: 10 },
   tileTitle: { color: '#fff', fontSize: 15, fontWeight: '700', textAlign: 'center' },
 
+  // Progress Charts banner card
   progressCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -195,6 +209,7 @@ const styles = StyleSheet.create({
   progressSubtitle: { color: '#5a7fa8', fontSize: 12 },
   progressArrow: { fontSize: 32, color: '#4A9EFF' },
 
+  // Unused quote card styles (kept for reference / future use)
   quoteCard: {
     backgroundColor: '#0d1f3c',
     borderRadius: 16,

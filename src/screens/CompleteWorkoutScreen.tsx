@@ -6,6 +6,7 @@ import {
 import { workoutAPI } from '../services/api';
 import { useDailyQuote } from '../hooks/useDailyQuote';
 
+// Maps star rating (1–5) to a motivational label shown below the stars
 const RATING_LABELS: Record<number, string> = {
   1: 'Rough session 😅',
   2: 'Keep pushing! 💪',
@@ -16,18 +17,22 @@ const RATING_LABELS: Record<number, string> = {
 
 export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
   const { workout } = route.params || {};
-  const [rating, setRating] = useState(0);
-  const [comment, setComment] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [showTemplateModal, setShowTemplateModal] = useState(false);
-  const [templateName, setTemplateName] = useState('');
 
+  const [rating, setRating]                       = useState(0);
+  const [comment, setComment]                     = useState('');
+  const [loading, setLoading]                     = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false); // controls save-template bottom sheet
+  const [templateName, setTemplateName]           = useState('');
+
+  // Pulls a motivational quote from the API (or cache) via custom hook
   const { quote, loading: quoteLoading } = useDailyQuote();
 
-  const totalSets = workout?.exercises?.reduce((t: number, ex: any) => t + ex.sets.length, 0) || 0;
+  // Calculate total sets and how many the user actually completed
+  const totalSets     = workout?.exercises?.reduce((t: number, ex: any) => t + ex.sets.length, 0) || 0;
   const completedSets = workout?.exercises?.reduce((t: number, ex: any) =>
     t + ex.sets.filter((s: any) => s.completed).length, 0) || 0;
 
+  // Submits the workout rating + notes to the API, then prompts to save as template
   const handleSubmit = async () => {
     if (rating === 0) {
       Alert.alert('Rating Required', 'Please rate your workout before completing');
@@ -37,6 +42,7 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
     try {
       await workoutAPI.completeWorkout(workout._id, rating, comment);
       setLoading(false);
+      // Offer template save after successful completion
       Alert.alert(
         'Workout Complete! 🎉',
         'Great job! Would you like to save this as a template?',
@@ -51,6 +57,7 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
     }
   };
 
+  // Saves the completed workout as a reusable template with the given name
   const handleSaveTemplate = async () => {
     if (!templateName.trim()) { Alert.alert('Error', 'Please enter a template name'); return; }
     try {
@@ -69,14 +76,14 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Header */}
+        {/* ── Celebration Header ── */}
         <View style={styles.header}>
           <Text style={styles.headerEmoji}>🏆</Text>
           <Text style={styles.headerTitle}>Workout Complete!</Text>
           <Text style={styles.headerSub}>{workout?.title}</Text>
         </View>
 
-        {/* Stats Summary */}
+        {/* ── Stats Summary Card: exercises / sets done / skipped ── */}
         <View style={styles.statsCard}>
           <Text style={styles.cardLabel}>SUMMARY</Text>
           <View style={styles.statsRow}>
@@ -90,26 +97,29 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
                   <Text style={styles.statValue}>{stat.value}</Text>
                   <Text style={styles.statLabel}>{stat.label}</Text>
                 </View>
+                {/* Vertical divider between stats, but not after the last one */}
                 {i < 2 && <View style={styles.statDivider} />}
               </React.Fragment>
             ))}
           </View>
         </View>
 
-        {/* Star Rating */}
+        {/* ── Star Rating Card ── */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>RATE YOUR WORKOUT</Text>
           <View style={styles.starsRow}>
             {[1, 2, 3, 4, 5].map(star => (
               <TouchableOpacity key={star} onPress={() => setRating(star)} style={styles.starBtn}>
+                {/* Filled gold star if at or below current rating, empty otherwise */}
                 <Text style={[styles.star, star <= rating && styles.starFilled]}>★</Text>
               </TouchableOpacity>
             ))}
           </View>
+          {/* Motivational label appears once user picks a rating */}
           {rating > 0 && <Text style={styles.ratingLabel}>{RATING_LABELS[rating]}</Text>}
         </View>
 
-        {/* Notes */}
+        {/* ── Optional Notes Input ── */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>NOTES (OPTIONAL)</Text>
           <TextInput
@@ -124,7 +134,7 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
           />
         </View>
 
-        {/* Daily Quote */}
+        {/* ── Daily Inspiration Quote ── */}
         <View style={styles.quoteCard}>
           <Text style={styles.quoteIcon}>✨</Text>
           <View style={{ flex: 1 }}>
@@ -137,12 +147,13 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
                 {quote.author ? <Text style={styles.quoteAuthor}>— {quote.author}</Text> : null}
               </>
             ) : (
+              // Fallback quote shown if the API returns nothing
               <Text style={styles.quoteText}>"Discipline is doing what needs to be done, even when you don't want to."</Text>
             )}
           </View>
         </View>
 
-        {/* Complete Button */}
+        {/* ── Complete Workout Button ── */}
         <TouchableOpacity
           style={[styles.completeBtn, loading && styles.btnDisabled]}
           onPress={handleSubmit}
@@ -156,8 +167,13 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* Template Modal */}
-      <Modal visible={showTemplateModal} transparent animationType="slide" onRequestClose={() => setShowTemplateModal(false)}>
+      {/* ── Save as Template Bottom Sheet Modal ── */}
+      <Modal
+        visible={showTemplateModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowTemplateModal(false)}
+      >
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle}>💾  Save as Template</Text>
@@ -171,6 +187,7 @@ export const CompleteWorkoutScreen = ({ route, navigation }: any) => {
               autoFocus
             />
             <View style={styles.modalButtons}>
+              {/* Cancel skips saving but still navigates back */}
               <TouchableOpacity
                 style={styles.modalCancelBtn}
                 onPress={() => { setShowTemplateModal(false); navigation.popToTop(); }}
@@ -226,7 +243,7 @@ const styles = StyleSheet.create({
     minHeight: 100, borderWidth: 1, borderColor: '#1a3a6b',
   },
 
-  // Daily quote
+  // Daily quote card
   quoteCard: {
     flexDirection: 'row', backgroundColor: '#0d1f3c',
     borderRadius: 16, padding: 18, marginBottom: 20,
@@ -244,6 +261,7 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.6 },
   completeBtnText: { color: '#fff', fontSize: 17, fontWeight: '800' },
 
+  // Template save modal (slides up from bottom)
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: '#0d1f3c', borderTopLeftRadius: 24, borderTopRightRadius: 24,

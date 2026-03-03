@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+} from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { nutritionAPI } from '../services/api';
 import { useDailyQuote } from '../hooks/useDailyQuote';
@@ -13,16 +20,30 @@ interface DayData {
   fat: number;
 }
 
+// Weekly Nutrition Overview Screen
 export const WeeklyNutritionScreen = ({ navigation }: any) => {
   const { user } = useAuth();
-  const quote = useDailyQuote();
+  const quote = useDailyQuote(); // inspirational/motivational quote hook
+
   const [loading, setLoading] = useState(true);
   const [weekData, setWeekData] = useState<DayData[]>([]);
-  const [weekTotal, setWeekTotal] = useState({ calories: 0, protein: 0, carbs: 0, fat: 0 });
+  const [weekTotal, setWeekTotal] = useState({
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+  });
   const [expandedDay, setExpandedDay] = useState<number | null>(null);
 
-  useEffect(() => { loadWeeklyData(); }, []);
+  // Load data once on mount
+  useEffect(() => {
+    loadWeeklyData();
+  }, []);
 
+  /**
+   * Fetches nutrition data for the last 7 days (including today)
+   * Aggregates totals and prepares display-ready data
+   */
   const loadWeeklyData = async () => {
     try {
       setLoading(true);
@@ -31,6 +52,7 @@ export const WeeklyNutritionScreen = ({ navigation }: any) => {
       const days: DayData[] = [];
       const today = new Date();
 
+      // Collect last 7 days (most recent first)
       for (let i = 6; i >= 0; i--) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
@@ -39,27 +61,55 @@ export const WeeklyNutritionScreen = ({ navigation }: any) => {
 
         try {
           const nutrition = await nutritionAPI.getNutrition(user.id, dateStr);
-          let totalProtein = 0, totalCarbs = 0, totalFat = 0;
-          ['breakfast', 'lunch', 'dinner', 'snacks'].forEach(meal => {
+
+          // Sum macros across all meals
+          let totalProtein = 0,
+            totalCarbs = 0,
+            totalFat = 0;
+
+          ;['breakfast', 'lunch', 'dinner', 'snacks'].forEach((meal) => {
             (nutrition[meal] || []).forEach((item: any) => {
               totalProtein += item.protein || 0;
               totalCarbs += item.carbs || 0;
               totalFat += item.fat || 0;
             });
           });
-          days.push({ date: dateStr, dayName, calories: nutrition.totalCalories || 0, protein: Math.round(totalProtein), carbs: Math.round(totalCarbs), fat: Math.round(totalFat) });
+
+          days.push({
+            date: dateStr,
+            dayName,
+            calories: nutrition.totalCalories || 0,
+            protein: Math.round(totalProtein),
+            carbs: Math.round(totalCarbs),
+            fat: Math.round(totalFat),
+          });
         } catch {
-          days.push({ date: dateStr, dayName, calories: 0, protein: 0, carbs: 0, fat: 0 });
+          // Graceful fallback when data is missing for a day
+          days.push({
+            date: dateStr,
+            dayName,
+            calories: 0,
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+          });
         }
       }
 
-      setWeekData(days.reverse());
-      const totals = days.reduce((acc, day) => ({
-        calories: acc.calories + day.calories,
-        protein: acc.protein + day.protein,
-        carbs: acc.carbs + day.carbs,
-        fat: acc.fat + day.fat,
-      }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+      // Reverse so today is first (index 0)
+      const orderedDays = days.reverse();
+      setWeekData(orderedDays);
+
+      // Calculate weekly totals
+      const totals = orderedDays.reduce(
+        (acc, day) => ({
+          calories: acc.calories + day.calories,
+          protein: acc.protein + day.protein,
+          carbs: acc.carbs + day.carbs,
+          fat: acc.fat + day.fat,
+        }),
+        { calories: 0, protein: 0, carbs: 0, fat: 0 }
+      );
       setWeekTotal(totals);
     } catch (error) {
       console.error('Load weekly data error:', error);
@@ -79,18 +129,32 @@ export const WeeklyNutritionScreen = ({ navigation }: any) => {
 
   const today = weekData[0];
   const avgCalories = Math.round(weekTotal.calories / 7);
-  const totalKcalBurned = weekTotal.calories; // same as consumed for display
-  const maxCalories = Math.max(...weekData.map(d => d.calories), 1);
+  const maxCalories = Math.max(...weekData.map((d) => d.calories), 1);
 
   const macros = [
-    { label: 'Protein', value: weekTotal.protein, color: '#4A9EFF', pct: Math.round((weekTotal.protein * 4 / (weekTotal.calories || 1)) * 100) },
-    { label: 'Carbs',   value: weekTotal.carbs,   color: '#4A9EFF', pct: Math.round((weekTotal.carbs * 4   / (weekTotal.calories || 1)) * 100) },
-    { label: 'Fat',     value: weekTotal.fat,      color: '#4A9EFF', pct: Math.round((weekTotal.fat * 9    / (weekTotal.calories || 1)) * 100) },
+    {
+      label: 'Protein',
+      value: weekTotal.protein,
+      color: '#4A9EFF',
+      pct: Math.round((weekTotal.protein * 4 / (weekTotal.calories || 1)) * 100),
+    },
+    {
+      label: 'Carbs',
+      value: weekTotal.carbs,
+      color: '#4A9EFF',
+      pct: Math.round((weekTotal.carbs * 4 / (weekTotal.calories || 1)) * 100),
+    },
+    {
+      label: 'Fat',
+      value: weekTotal.fat,
+      color: '#4A9EFF',
+      pct: Math.round((weekTotal.fat * 9 / (weekTotal.calories || 1)) * 100),
+    },
   ];
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+      {/* Header with back button */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>← Back</Text>
@@ -100,12 +164,13 @@ export const WeeklyNutritionScreen = ({ navigation }: any) => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-
-        {/* 1. Weekly Macros */}
+        {/* Weekly Macros Overview */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>WEEKLY MACROS</Text>
+
+          {/* Quick macro tiles */}
           <View style={styles.macroTotals}>
-            {macros.map(m => (
+            {macros.map((m) => (
               <View key={m.label} style={styles.macroTile}>
                 <Text style={styles.macroTileValue}>{m.value}g</Text>
                 <Text style={styles.macroTileLabel}>{m.label}</Text>
@@ -113,30 +178,39 @@ export const WeeklyNutritionScreen = ({ navigation }: any) => {
               </View>
             ))}
           </View>
-          {macros.map(m => (
+
+          {/* Macro progress bars */}
+          {macros.map((m) => (
             <View key={m.label} style={styles.macroBarRow}>
               <Text style={styles.macroBarLabel}>{m.label}</Text>
               <View style={styles.macroBarTrack}>
-                <View style={[styles.macroBarFill, { width: `${Math.min(m.pct, 100)}%`, backgroundColor: m.color }]} />
+                <View
+                  style={[
+                    styles.macroBarFill,
+                    { width: `${Math.min(m.pct, 100)}%`, backgroundColor: m.color },
+                  ]}
+                />
               </View>
               <Text style={styles.macroBarValue}>{m.value}g</Text>
             </View>
           ))}
         </View>
 
-        {/* 2. Today's Breakdown */}
+        {/* Today's summary card */}
         {today && (
-          <View style={[styles.card, { borderTopColor: '#4A9EFF'}]}>
+          <View style={[styles.card, { borderTopColor: '#4A9EFF' }]}>
             <Text style={styles.cardTitle}>TODAY'S BREAKDOWN</Text>
             <View style={styles.todayGrid}>
               {[
                 { label: 'Calories', value: `${today.calories}`, color: '#4A9EFF' },
-                { label: 'Protein',  value: `${today.protein}g`, color: '#4A9EFF' },
-                { label: 'Carbs',    value: `${today.carbs}g`,   color: '#4A9EFF' },
-                { label: 'Fat',      value: `${today.fat}g`,     color: '#4A9EFF' },
-              ].map(item => (
+                { label: 'Protein', value: `${today.protein}g`, color: '#4A9EFF' },
+                { label: 'Carbs', value: `${today.carbs}g`, color: '#4A9EFF' },
+                { label: 'Fat', value: `${today.fat}g`, color: '#4A9EFF' },
+              ].map((item) => (
                 <View key={item.label} style={styles.todayTile}>
-                  <Text style={[styles.todayValue, { color: item.color }]}>{item.value}</Text>
+                  <Text style={[styles.todayValue, { color: item.color }]}>
+                    {item.value}
+                  </Text>
                   <Text style={styles.todayLabel}>{item.label}</Text>
                 </View>
               ))}
@@ -144,16 +218,19 @@ export const WeeklyNutritionScreen = ({ navigation }: any) => {
           </View>
         )}
 
-        {/* 3. Daily Breakdown — Today shown, rest collapsible */}
+        {/* 7-day list — today always visible, others collapsible */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>DAILY BREAKDOWN</Text>
+
           {weekData.map((day, i) => {
             const isToday = i === 0;
             const isExpanded = expandedDay === i;
-            const dateLabel = new Date(day.date).toLocaleDateString('en-GB', { month: 'short', day: 'numeric' });
+            const dateLabel = new Date(day.date).toLocaleDateString('en-GB', {
+              month: 'short',
+              day: 'numeric',
+            });
 
             if (isToday) {
-              // Always show today fully
               return (
                 <View key={i} style={[styles.dayRow, styles.dayRowToday]}>
                   <View style={styles.dayLeft}>
@@ -170,7 +247,6 @@ export const WeeklyNutritionScreen = ({ navigation }: any) => {
               );
             }
 
-            // Other days — tap arrow to expand
             return (
               <View key={i}>
                 <TouchableOpacity
@@ -186,13 +262,14 @@ export const WeeklyNutritionScreen = ({ navigation }: any) => {
                     <Text style={styles.dayArrow}>{isExpanded ? '▲' : '▼'}</Text>
                   </View>
                 </TouchableOpacity>
+
                 {isExpanded && (
                   <View style={styles.dayExpanded}>
                     {[
                       { label: 'Protein', value: `${day.protein}g` },
-                      { label: 'Carbs',   value: `${day.carbs}g` },
-                      { label: 'Fat',     value: `${day.fat}g` },
-                    ].map(m => (
+                      { label: 'Carbs', value: `${day.carbs}g` },
+                      { label: 'Fat', value: `${day.fat}g` },
+                    ].map((m) => (
                       <View key={m.label} style={styles.expandedRow}>
                         <Text style={styles.expandedLabel}>{m.label}</Text>
                         <Text style={styles.expandedValue}>{m.value}</Text>
@@ -205,34 +282,46 @@ export const WeeklyNutritionScreen = ({ navigation }: any) => {
           })}
         </View>
 
-        {/* 4. Daily Calories Chart */}
+        {/* Simple bar chart — daily calories */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>DAILY CALORIES</Text>
           <View style={styles.chart}>
             {weekData.map((day, i) => {
-              const barH = Math.max((day.calories / maxCalories) * 120, day.calories > 0 ? 8 : 0);
+              const barHeight = Math.max((day.calories / maxCalories) * 120, day.calories > 0 ? 8 : 0);
               const isToday = i === 0;
+
               return (
                 <View key={i} style={styles.barWrap}>
                   <Text style={styles.barVal}>{day.calories > 0 ? day.calories : ''}</Text>
-                  <View style={[styles.bar, { height: barH, backgroundColor: isToday ? '#4A9EFF' : '#1a3a6b' }]} />
-                  <Text style={[styles.barDay, isToday && { color: '#4A9EFF' }]}>{day.dayName}</Text>
+                  <View
+                    style={[
+                      styles.bar,
+                      { height: barHeight, backgroundColor: isToday ? '#4A9EFF' : '#1a3a6b' },
+                    ]}
+                  />
+                  <Text style={[styles.barDay, isToday && { color: '#4A9EFF' }]}>
+                    {day.dayName}
+                  </Text>
                 </View>
               );
             })}
           </View>
         </View>
 
-        {/* 5. Totals & Averages */}
+        {/* Summary statistics */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>TOTALS & AVERAGES</Text>
           <View style={styles.summaryGrid}>
             {[
               { label: 'Total kcal\nConsumed', value: weekTotal.calories.toLocaleString(), icon: '🔥' },
-              { label: 'Daily\nAverage',        value: avgCalories.toLocaleString(),        icon: '📊' },
-              { label: 'Total\nProtein',         value: `${weekTotal.protein}g`,             icon: '💪' },
-              { label: 'Days\nLogged',           value: weekData.filter(d => d.calories > 0).length.toString(), icon: '📅' },
-            ].map(item => (
+              { label: 'Daily\nAverage', value: avgCalories.toLocaleString(), icon: '📊' },
+              { label: 'Total\nProtein', value: `${weekTotal.protein}g`, icon: '💪' },
+              {
+                label: 'Days\nLogged',
+                value: weekData.filter((d) => d.calories > 0).length.toString(),
+                icon: '📅',
+              },
+            ].map((item) => (
               <View key={item.label} style={styles.summaryTile}>
                 <Text style={styles.summaryIcon}>{item.icon}</Text>
                 <Text style={styles.summaryValue}>{item.value}</Text>
@@ -242,8 +331,7 @@ export const WeeklyNutritionScreen = ({ navigation }: any) => {
           </View>
         </View>
 
-
-        {/* Faith Card */}
+        {/* Motivational / faith-based quote card */}
         <View style={styles.faithCard}>
           <Text style={styles.faithIcon}>🙏</Text>
           <View style={{ flex: 1 }}>

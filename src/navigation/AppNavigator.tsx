@@ -5,7 +5,8 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { colors, spacing } from '../theme/colors';
 import { useAuth } from '../context/AuthContext';
-// Import all screens
+
+// Screen Imports
 import { LoginScreen } from '../screens/LoginScreen';
 import { DashboardScreen } from '../screens/DashboardScreen';
 import { SearchScreen } from '../screens/SearchScreen';
@@ -25,16 +26,21 @@ import { ProgressChartsScreen } from '../screens/ProgressChartsScreen';
 import { WeeklyNutritionScreen } from '../screens/WeeklyNutritionScreen';
 import { WorkoutTemplatesScreen } from '../screens/WorkoutTemplatesScreen';
 
+// Navigation Setup
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
+// Custom top navigation bar used across main tabs
 const NavBar = ({ navigation, activeTab }: { navigation: any; activeTab: 'search' | 'dashboard' | 'profile' }) => (
   <View style={styles.topNav}>
+    {/* App logo */}
     <Image
       source={require('../../assets/logo.png')}
       style={styles.logo}
       resizeMode="contain"
     />
+
+    {/* Centered pill-style tab switcher */}
     <View style={styles.navPills}>
       <TouchableOpacity
         style={[styles.navPill, activeTab === 'search' && styles.navPillActive]}
@@ -42,12 +48,14 @@ const NavBar = ({ navigation, activeTab }: { navigation: any; activeTab: 'search
       >
         <Text style={styles.navPillText}>🔍</Text>
       </TouchableOpacity>
+
       <TouchableOpacity
         style={[styles.navPill, activeTab === 'dashboard' && styles.navPillActive]}
         onPress={() => navigation.navigate('DashboardTab')}
       >
         <Text style={styles.navPillText}>🏠</Text>
       </TouchableOpacity>
+
       <TouchableOpacity
         style={[styles.navPill, activeTab === 'profile' && styles.navPillActive]}
         onPress={() => navigation.navigate('ProfileTab')}
@@ -55,18 +63,22 @@ const NavBar = ({ navigation, activeTab }: { navigation: any; activeTab: 'search
         <Text style={styles.navPillText}>👤</Text>
       </TouchableOpacity>
     </View>
+
+    {/* Notification bell (placeholder — can be wired to real notifications later) */}
     <TouchableOpacity style={styles.bellIcon}>
       <Text style={styles.bellText}>🔔</Text>
     </TouchableOpacity>
   </View>
 );
 
+// Bottom-tab navigator for the three main app sections
+// We hide the default tab bar and use custom NavBar in headers instead
 const MainTabs = () => {
   return (
     <Tab.Navigator
       screenOptions={{
-        headerShown: true,  // ← enable headers globally
-        tabBarStyle: { display: 'none', height: 0 },
+        headerShown: true,
+        tabBarStyle: { display: 'none', height: 0 }, // hide default bottom tabs
         tabBarButton: () => null,
       }}
       initialRouteName="DashboardTab"
@@ -75,26 +87,29 @@ const MainTabs = () => {
         name="SearchTab"
         component={SearchScreen}
         options={{
-          header: ({ navigation }) => <NavBar navigation={navigation} activeTab="search" />
+          header: ({ navigation }) => <NavBar navigation={navigation} activeTab="search" />,
         }}
       />
       <Tab.Screen
         name="DashboardTab"
         component={DashboardScreen}
         options={{
-          header: ({ navigation }) => <NavBar navigation={navigation} activeTab="dashboard" />
+          header: ({ navigation }) => <NavBar navigation={navigation} activeTab="dashboard" />,
         }}
       />
       <Tab.Screen
         name="ProfileTab"
         component={ProfileScreen}
         options={{
-          header: ({ navigation }) => <NavBar navigation={navigation} activeTab="profile" />
+          header: ({ navigation }) => <NavBar navigation={navigation} activeTab="profile" />,
         }}
       />
     </Tab.Navigator>
   );
 };
+
+// Root Navigator
+// Handles auth-based routing: Login vs Main app + modal-like screens
 
 export const AppNavigator = () => {
   const { user } = useAuth();
@@ -104,28 +119,38 @@ export const AppNavigator = () => {
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
-          cardStyle: { backgroundColor: colors.primary.dark }
+          cardStyle: { backgroundColor: colors.primary.dark },
         }}
       >
         {user ? (
           <>
+            {/* Main authenticated flow */}
             <Stack.Screen name="Main" component={MainTabs} />
+
+            {/* Workout & Exercise Flow */}
             <Stack.Screen name="Health" component={HealthScreen} />
             <Stack.Screen name="Exercise" component={ExerciseScreen} />
-            <Stack.Screen name="ExerciseProgress" component={ExerciseProgressScreen} />
             <Stack.Screen name="ExerciseDetail" component={ExerciseDetailScreen} />
+            <Stack.Screen name="ExerciseProgress" component={ExerciseProgressScreen} />
             <Stack.Screen name="CompleteWorkout" component={CompleteWorkoutScreen} />
+            <Stack.Screen name="WorkoutTemplates" component={WorkoutTemplatesScreen} />
+
+            {/* Nutrition Flow */}
             <Stack.Screen name="Nutrition" component={NutritionScreen} />
             <Stack.Screen name="AddFood" component={AddFoodScreen} />
+            <Stack.Screen name="WeeklyNutrition" component={WeeklyNutritionScreen} />
+
+            {/* Community & Social */}
             <Stack.Screen name="Community" component={CommunityScreen} />
             <Stack.Screen name="CreatePost" component={CreatePostScreen} />
             <Stack.Screen name="PostDetail" component={PostDetailScreen} />
+
+            {/* Profile & Progress */}
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="ProgressCharts" component={ProgressChartsScreen} />
-            <Stack.Screen name="WeeklyNutrition" component={WeeklyNutritionScreen} />
-            <Stack.Screen name="WorkoutTemplates" component={WorkoutTemplatesScreen} />
           </>
         ) : (
+          // Unauthenticated users see only login
           <Stack.Screen name="Login" component={LoginScreen} />
         )}
       </Stack.Navigator>
@@ -133,6 +158,7 @@ export const AppNavigator = () => {
   );
 };
 
+// Styles
 const styles = StyleSheet.create({
   topNav: {
     flexDirection: 'row',
@@ -140,7 +166,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     backgroundColor: '#0d1f3c',
     paddingHorizontal: spacing.lg,
-    paddingTop: 50,
+    paddingTop: 50,           // safe area padding for notch/status bar
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.1)',
@@ -180,3 +206,5 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
 });
+
+export default AppNavigator;

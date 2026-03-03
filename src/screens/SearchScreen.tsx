@@ -1,7 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, FlatList, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  TextInput,
+  StyleSheet,
+  FlatList,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  ActivityIndicator,
+} from 'react-native';
 import { exerciseDB, Exercise } from '../services/exerciseDB';
 
+// Constants / Configuration
+/** Available filter categories shown as pills */
 const FILTERS = [
   { id: 'all',                   label: 'All' },
   { id: 'strength',              label: 'Strength' },
@@ -10,30 +22,37 @@ const FILTERS = [
   { id: 'plyometrics',           label: 'Plyometrics' },
   { id: 'powerlifting',          label: 'Powerlifting' },
   { id: 'olympic_weightlifting', label: 'Olympic' },
-];
+] as const;
 
+/** Color mapping for difficulty levels */
 const LEVEL_COLORS: Record<string, string> = {
   beginner:     '#26de81',
   intermediate: '#FF9F43',
   expert:       '#FF6B6B',
 };
 
+/** Color mapping for exercise categories (used for accents & tags) */
 const CATEGORY_COLORS: Record<string, string> = {
   strength:             '#4A9EFF',
   cardio:               '#FF6B6B',
   stretching:           '#26de81',
   plyometrics:          '#FF9F43',
   powerlifting:         '#7B6FFF',
-  olympic_weightlifting:'#FFD700',
+  olympic_weightlifting: '#FFD700',
 };
 
+// Main Component
 export const SearchScreen = ({ navigation }: any) => {
+  // Search & filter state
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('all');
-  const [results, setResults] = useState<Exercise[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searching, setSearching] = useState(false);
 
+  // Results & loading states
+  const [results, setResults] = useState<Exercise[]>([]);
+  const [loading, setLoading] = useState(true);     // Initial data load
+  const [searching, setSearching] = useState(false); // Debounced search in progress
+
+  // Load all exercises once on mount (initial population)
   useEffect(() => {
     const init = async () => {
       setLoading(true);
@@ -44,6 +63,8 @@ export const SearchScreen = ({ navigation }: any) => {
     init();
   }, []);
 
+  // Debounced search + filter effect
+  // Triggers whenever query or filter changes
   useEffect(() => {
     const timer = setTimeout(async () => {
       setSearching(true);
@@ -51,9 +72,11 @@ export const SearchScreen = ({ navigation }: any) => {
       setResults(data);
       setSearching(false);
     }, 400);
+
     return () => clearTimeout(timer);
   }, [query, filter]);
 
+  // Render single exercise card
   const renderExercise = ({ item }: { item: Exercise }) => {
     const color = CATEGORY_COLORS[item.category] || '#4A9EFF';
     const levelColor = LEVEL_COLORS[item.level] || '#4A9EFF';
@@ -65,38 +88,55 @@ export const SearchScreen = ({ navigation }: any) => {
         onPress={() => navigation.navigate('ExerciseDetail', { exercise: item })}
         activeOpacity={0.7}
       >
+        {/* Exercise image or fallback emoji placeholder */}
         {imageUrl ? (
-          <Image source={{ uri: imageUrl }} style={styles.cardImage} resizeMode="cover" />
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.cardImage}
+            resizeMode="cover"
+          />
         ) : (
           <View style={[styles.cardImagePlaceholder, { backgroundColor: color + '22' }]}>
             <Text style={styles.cardImageEmoji}>💪</Text>
           </View>
         )}
+
         <View style={styles.cardInfo}>
-          <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.cardName} numberOfLines={1}>
+            {item.name}
+          </Text>
+
           <View style={styles.cardMeta}>
             <Text style={[styles.cardCategory, { color }]}>{item.category}</Text>
             <Text style={styles.cardDot}>·</Text>
             <Text style={[styles.cardLevel, { color: levelColor }]}>{item.level}</Text>
           </View>
+
           <Text style={styles.cardMuscles} numberOfLines={1}>
             {item.primaryMuscles.join(', ')}
           </Text>
         </View>
+
         <Text style={[styles.cardArrow, { color }]}>›</Text>
       </TouchableOpacity>
     );
   };
 
+  // Main render
   return (
     <View style={styles.container}>
+      {/* Header with title and close button */}
       <View style={styles.header}>
         <Text style={styles.title}>EXERCISES</Text>
-        <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.navigate('DashboardTab')}>
+        <TouchableOpacity
+          style={styles.closeBtn}
+          onPress={() => navigation.navigate('DashboardTab')}
+        >
           <Text style={styles.closeBtnText}>✕</Text>
         </TouchableOpacity>
       </View>
 
+      {/* Search input with clear button */}
       <View style={styles.searchBar}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
@@ -107,25 +147,39 @@ export const SearchScreen = ({ navigation }: any) => {
           onChangeText={setQuery}
           autoCorrect={false}
         />
+
         {(query.length > 0 || searching) && (
           <TouchableOpacity onPress={() => setQuery('')}>
-            {searching
-              ? <ActivityIndicator size="small" color="#4A9EFF" />
-              : <Text style={styles.clearBtn}>✕</Text>
-            }
+            {searching ? (
+              <ActivityIndicator size="small" color="#4A9EFF" />
+            ) : (
+              <Text style={styles.clearBtn}>✕</Text>
+            )}
           </TouchableOpacity>
         )}
       </View>
 
+      {/* Horizontal filter pills */}
       <View style={styles.filterBar}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterContent}>
-          {FILTERS.map(item => (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterContent}
+        >
+          {FILTERS.map((item) => (
             <TouchableOpacity
               key={item.id}
-              style={[styles.filterPill, filter === item.id && styles.filterPillActive]}
+              style={[
+                styles.filterPill,
+                filter === item.id && styles.filterPillActive,
+              ]}
               onPress={() => setFilter(item.id)}
             >
-              <Text style={filter === item.id ? styles.filterTextActive : styles.filterText}>
+              <Text
+                style={
+                  filter === item.id ? styles.filterTextActive : styles.filterText
+                }
+              >
                 {item.label}
               </Text>
             </TouchableOpacity>
@@ -133,10 +187,12 @@ export const SearchScreen = ({ navigation }: any) => {
         </ScrollView>
       </View>
 
+      {/* Results count or loading message */}
       <Text style={styles.resultsCount}>
         {loading ? 'Loading exercises...' : `${results.length} EXERCISES`}
       </Text>
 
+      {/* Loading state or results list */}
       {loading ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color="#4A9EFF" />
@@ -146,14 +202,16 @@ export const SearchScreen = ({ navigation }: any) => {
         <FlatList
           data={results}
           renderItem={renderExercise}
-          keyExtractor={item => item.id}
+          keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Text style={styles.emptyEmoji}>🔍</Text>
               <Text style={styles.emptyTitle}>No exercises found</Text>
-              <Text style={styles.emptyText}>Try a different search or filter</Text>
+              <Text style={styles.emptyText}>
+                Try a different search or filter
+              </Text>
             </View>
           }
         />
@@ -162,6 +220,7 @@ export const SearchScreen = ({ navigation }: any) => {
   );
 };
 
+// Styles
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#0a1628' },
   centered: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 60 },
@@ -218,3 +277,5 @@ const styles = StyleSheet.create({
   emptyTitle: { color: '#fff', fontSize: 18, fontWeight: '800', marginBottom: 8 },
   emptyText: { color: '#5a7fa8', fontSize: 14 },
 });
+
+export default SearchScreen;

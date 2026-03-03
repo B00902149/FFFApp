@@ -1,6 +1,3 @@
-// src/services/exerciseDB.ts
-// Free, no API key needed - 800+ exercises with images
-
 const BASE_URL = 'https://raw.githubusercontent.com/yuhonas/free-exercise-db/main';
 const EXERCISES_URL = `${BASE_URL}/dist/exercises.json`;
 export const IMAGE_BASE = `${BASE_URL}/exercises/`;

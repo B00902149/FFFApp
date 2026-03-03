@@ -9,8 +9,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { profileAPI } from '../services/api';
 import { pickImage, convertImageToBase64 } from '../utils/imagePicker';
 
+// Used to calculate chart point positions relative to screen width
 const screenWidth = Dimensions.get('window').width;
 
+// Measurement fields shown in the new entry modal — differ by gender
 const MALE_MEASUREMENTS = [
   { key: 'chest',      label: 'Chest' },
   { key: 'shoulders',  label: 'Shoulders' },
@@ -41,33 +43,37 @@ const FEMALE_MEASUREMENTS = [
   { key: 'shoulders',  label: 'Shoulders' },
 ];
 
+// Converts camelCase measurement keys to readable labels for the timeline
+// e.g. "bicepLeft" → "Bicep (L)"
 const formatKey = (key: string) =>
   key.replace(/([A-Z])/g, ' $1').replace('Left', '(L)').replace('Right', '(R)').trim();
 
 export const ProgressChartsScreen = ({ navigation }: any) => {
   const { user } = useAuth();
-  const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState<any>(null);
-  const [entries, setEntries] = useState<any[]>([]);
+  const [loading, setLoading]   = useState(true);
+  const [profile, setProfile]   = useState<any>(null);
+  const [entries, setEntries]   = useState<any[]>([]); // all progress entries, newest first
 
-  // New entry modal
-  const [modalVisible, setModalVisible] = useState(false);
-  const [entryWeight, setEntryWeight] = useState('');
-  const [entryMeasurements, setEntryMeasurements] = useState<Record<string, string>>({});
-  const [entryPhoto, setEntryPhoto] = useState<string | null>(null);
-  const [entryNote, setEntryNote] = useState('');
-  const [savingEntry, setSavingEntry] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  // ── New Entry Modal State ──────────────────────────────────────────────────
+  const [modalVisible, setModalVisible]         = useState(false);
+  const [entryWeight, setEntryWeight]           = useState('');
+  const [entryMeasurements, setEntryMeasurements] = useState<Record<string, string>>({}); // key → value string
+  const [entryPhoto, setEntryPhoto]             = useState<string | null>(null); // base64 string or null
+  const [entryNote, setEntryNote]               = useState('');
+  const [savingEntry, setSavingEntry]           = useState(false);
+  const [uploadingPhoto, setUploadingPhoto]     = useState(false); // separate spinner for photo only
 
+  // Reload whenever the screen comes into focus
   useFocusEffect(useCallback(() => { loadData(); }, []));
 
+  // Fetches the user's profile and reads progressEntries from it
   const loadData = async () => {
     if (!user?.id) return;
     try {
       setLoading(true);
       const profileData = await profileAPI.getProfile(user.id);
       setProfile(profileData);
-      // Load entries from profile.progressEntries (array we'll store in backend)
+      // progressEntries is stored as an array on the profile document
       setEntries(profileData?.progressEntries || []);
     } catch (error) {
       console.error('Load progress error:', error);
@@ -76,19 +82,20 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
     }
   };
 
+  // Presents a camera/gallery picker, converts the selected image to base64, and stores it
   const handlePickPhoto = async () => {
     Alert.alert('Add Photo', 'Choose source', [
       { text: 'Camera', onPress: async () => {
         setUploadingPhoto(true);
         try {
-          const uri = await pickImage(true);
+          const uri = await pickImage(true); // true = use camera
           if (uri) { const b64 = await convertImageToBase64(uri); setEntryPhoto(b64); }
         } finally { setUploadingPhoto(false); }
       }},
       { text: 'Gallery', onPress: async () => {
         setUploadingPhoto(true);
         try {
-          const uri = await pickImage(false);
+          const uri = await pickImage(false); // false = use gallery
           if (uri) { const b64 = await convertImageToBase64(uri); setEntryPhoto(b64); }
         } finally { setUploadingPhoto(false); }
       }},
@@ -96,7 +103,9 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
     ]);
   };
 
+  // Validates, builds the new entry object, prepends it to the list, and saves to the backend
   const handleSaveEntry = async () => {
+    // Require at least a weight or one measurement value
     if (!entryWeight && Object.keys(entryMeasurements).filter(k => entryMeasurements[k]).length === 0) {
       Alert.alert('Error', 'Please enter at least a weight or one measurement.');
       return;
@@ -104,7 +113,7 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
     setSavingEntry(true);
     try {
       const newEntry = {
-        id: Date.now().toString(),
+        id: Date.now().toString(), // simple unique ID using timestamp
         date: new Date().toISOString(),
         weight: entryWeight ? parseFloat(entryWeight) : null,
         measurements: entryMeasurements,
@@ -114,7 +123,9 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
         measureUnit: profile?.measureUnit || 'cm',
       };
 
+      // Prepend new entry so the list is newest-first
       const updatedEntries = [newEntry, ...entries];
+      // progressEntries is persisted as part of the profile document
       await profileAPI.updateProfile(user.id, { progressEntries: updatedEntries });
       setEntries(updatedEntries);
       setModalVisible(false);
@@ -126,11 +137,13 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
     }
   };
 
+  // Clears all modal input fields ready for the next entry
   const resetModal = () => {
     setEntryWeight(''); setEntryMeasurements({});
     setEntryPhoto(null); setEntryNote('');
   };
 
+  // Confirms then removes the entry by filtering it from the local array and saving to the backend
   const handleDeleteEntry = (id: string) => {
     Alert.alert('Delete Entry', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
@@ -142,11 +155,13 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
     ]);
   };
 
+  // Chooses the correct measurement set based on the user's gender (defaults to male)
   const activeMeasurements = profile?.gender === 'female' ? FEMALE_MEASUREMENTS : MALE_MEASUREMENTS;
 
-  // Weight chart
+  // Take the 10 most recent entries that have a weight value, then reverse for chronological order
   const weightEntries = entries.filter(e => e.weight).slice(0, 10).reverse();
 
+  // Renders a simple scatter/dot chart for weight progression
   const renderWeightChart = () => {
     if (weightEntries.length < 2) return (
       <View style={styles.card}>
@@ -155,49 +170,65 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
       </View>
     );
 
-    const weights = weightEntries.map(e => e.weight);
-    const maxW = Math.max(...weights), minW = Math.min(...weights);
-    const range = maxW - minW || 1;
-    const paddedMax = maxW + range * 0.2, paddedMin = minW - range * 0.2;
+    const weights    = weightEntries.map(e => e.weight);
+    const maxW       = Math.max(...weights);
+    const minW       = Math.min(...weights);
+    const range      = maxW - minW || 1; // avoid division by zero if all values are equal
+    // Add 20% padding above and below the data range so dots aren't clipped at the edges
+    const paddedMax  = maxW + range * 0.2;
+    const paddedMin  = minW - range * 0.2;
     const paddedRange = paddedMax - paddedMin;
-    const chartHeight = 140, chartWidth = screenWidth - 100;
-    const pointWidth = chartWidth / (weightEntries.length - 1);
-    const current = weights[weights.length - 1], start = weights[0];
-    const change = current - start;
+
+    const chartHeight = 140;
+    const chartWidth  = screenWidth - 100; // accounts for y-axis and card padding
+    const pointWidth  = chartWidth / (weightEntries.length - 1); // horizontal gap between dots
+
+    const current = weights[weights.length - 1];
+    const start   = weights[0];
+    const change  = current - start; // positive = weight gain, negative = loss
 
     return (
       <View style={styles.card}>
         <Text style={styles.cardLabel}>WEIGHT PROGRESS</Text>
         <View style={styles.chartRow}>
+          {/* Y-axis labels: top, mid, bottom of the padded range */}
           <View style={[styles.yAxis, { height: chartHeight }]}>
             <Text style={styles.axisLabel}>{paddedMax.toFixed(1)}</Text>
             <Text style={styles.axisLabel}>{((paddedMax + paddedMin) / 2).toFixed(1)}</Text>
             <Text style={styles.axisLabel}>{paddedMin.toFixed(1)}</Text>
           </View>
           <View style={[styles.chartArea, { width: chartWidth, height: chartHeight }]}>
+            {/* Horizontal grid lines at equal vertical intervals */}
             {[0, 1, 2, 3].map(i => <View key={i} style={[styles.gridLine, { top: (chartHeight / 3) * i }]} />)}
+            {/* Dots: the most recent entry is larger with a white fill */}
             {weightEntries.map((entry, index) => {
-              const norm = (entry.weight - paddedMin) / paddedRange;
-              const y = chartHeight - norm * chartHeight;
-              const x = index * pointWidth;
+              // Normalise weight to 0–1 range, then invert (y=0 is top in RN layout)
+              const norm   = (entry.weight - paddedMin) / paddedRange;
+              const y      = chartHeight - norm * chartHeight;
+              const x      = index * pointWidth;
               const isLast = index === weightEntries.length - 1;
               return (
                 <View key={index} style={{
                   position: 'absolute',
+                  // Clamp so dots don't overflow the chart area
                   left: Math.max(0, Math.min(chartWidth - 10, x - 5)),
-                  top: Math.max(0, Math.min(chartHeight - 10, y - 5)),
-                  width: isLast ? 12 : 8, height: isLast ? 12 : 8,
+                  top:  Math.max(0, Math.min(chartHeight - 10, y - 5)),
+                  width:  isLast ? 12 : 8,
+                  height: isLast ? 12 : 8,
                   borderRadius: isLast ? 6 : 4,
                   backgroundColor: isLast ? '#fff' : '#4A9EFF',
-                  borderWidth: isLast ? 2 : 0, borderColor: '#4A9EFF',
+                  borderWidth: isLast ? 2 : 0,
+                  borderColor: '#4A9EFF',
                 }} />
               );
             })}
           </View>
         </View>
+        {/* Summary stats below the chart */}
         <View style={styles.statsRow}>
           {[
             { label: 'Current', value: `${current.toFixed(1)}${profile?.weightUnit || 'kg'}`, color: '#4A9EFF' },
+            // Green for weight loss, red for gain
             { label: 'Change',  value: `${change >= 0 ? '+' : ''}${change.toFixed(1)}`, color: change < 0 ? '#26de81' : '#FF6B6B' },
             { label: 'Entries', value: `${weightEntries.length}`, color: '#FFD700' },
           ].map((s, i) => (
@@ -206,6 +237,7 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
                 <Text style={[styles.statValue, { color: s.color }]}>{s.value}</Text>
                 <Text style={styles.statLabel}>{s.label}</Text>
               </View>
+              {/* Vertical divider between stats, skipped after the last one */}
               {i < 2 && <View style={styles.statDivider} />}
             </React.Fragment>
           ))}
@@ -223,7 +255,8 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+
+      {/* ── Header: Back / Title / New Entry button ── */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>← Back</Text>
@@ -236,13 +269,15 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
+        {/* ── Weight Progress Chart ── */}
         {renderWeightChart()}
 
-        {/* Timeline */}
+        {/* ── Entry Timeline ── */}
         <View style={styles.card}>
           <Text style={styles.cardLabel}>ENTRY HISTORY</Text>
 
           {entries.length === 0 ? (
+            /* Empty state with CTA to log the first entry */
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>📊</Text>
               <Text style={styles.emptyTitle}>No entries yet</Text>
@@ -253,8 +288,10 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
             </View>
           ) : (
             entries.map((entry, index) => (
+              // Bottom border removed from the last entry to avoid double-border at card edge
               <View key={entry.id} style={[styles.timelineEntry, index === entries.length - 1 && { borderBottomWidth: 0 }]}>
-                {/* Date + delete */}
+
+                {/* Entry header: date badge + delete button */}
                 <View style={styles.entryHeader}>
                   <View style={styles.entryDateBadge}>
                     <Text style={styles.entryDateText}>
@@ -266,12 +303,12 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
                   </TouchableOpacity>
                 </View>
 
-                {/* Photo */}
+                {/* Progress photo — only shown if one was attached */}
                 {entry.photo && (
                   <Image source={{ uri: entry.photo }} style={styles.entryPhoto} />
                 )}
 
-                {/* Weight */}
+                {/* Weight row — only shown if a weight was logged */}
                 {entry.weight && (
                   <View style={styles.entryWeightRow}>
                     <Text style={styles.entryWeightIcon}>⚖️</Text>
@@ -279,11 +316,11 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
                   </View>
                 )}
 
-                {/* Measurements */}
+                {/* Measurement chips — only shown if at least one has a value */}
                 {entry.measurements && Object.keys(entry.measurements).filter(k => entry.measurements[k]).length > 0 && (
                   <View style={styles.entryMeasureGrid}>
                     {Object.entries(entry.measurements)
-                      .filter(([_, v]) => v)
+                      .filter(([_, v]) => v) // skip empty values
                       .map(([key, val]) => (
                         <View key={key} style={styles.entryMeasureChip}>
                           <Text style={styles.entryMeasureVal}>{val as string}</Text>
@@ -294,7 +331,7 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
                   </View>
                 )}
 
-                {/* Note */}
+                {/* Optional note — only shown if one was entered */}
                 {entry.note ? <Text style={styles.entryNote}>"{entry.note}"</Text> : null}
               </View>
             ))
@@ -304,8 +341,13 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
         <View style={{ height: 40 }} />
       </ScrollView>
 
-      {/* ── New Entry Modal ── */}
-      <Modal visible={modalVisible} transparent animationType="slide" onRequestClose={() => { setModalVisible(false); resetModal(); }}>
+      {/* ── New Entry Modal (bottom sheet) ── */}
+      <Modal
+        visible={modalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => { setModalVisible(false); resetModal(); }}
+      >
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalSheet}>
@@ -314,7 +356,7 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
 
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-                {/* Weight */}
+                {/* Weight input */}
                 <Text style={styles.modalSection}>⚖️  WEIGHT</Text>
                 <View style={styles.weightInputRow}>
                   <TextInput
@@ -328,7 +370,7 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
                   <Text style={styles.weightUnit}>{profile?.weightUnit || 'kg'}</Text>
                 </View>
 
-                {/* Photo */}
+                {/* Photo picker — shows spinner while uploading, preview once selected */}
                 <Text style={styles.modalSection}>📸  PROGRESS PHOTO</Text>
                 <TouchableOpacity style={styles.photoPickerBtn} onPress={handlePickPhoto} disabled={uploadingPhoto}>
                   {uploadingPhoto ? (
@@ -339,19 +381,21 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
                     <Text style={styles.photoPickerText}>Tap to add photo</Text>
                   )}
                 </TouchableOpacity>
+                {/* Remove photo link — only shown when a photo has been selected */}
                 {entryPhoto && (
                   <TouchableOpacity onPress={() => setEntryPhoto(null)} style={{ alignItems: 'center', marginBottom: 12 }}>
                     <Text style={{ color: '#FF6B6B', fontSize: 13 }}>Remove photo</Text>
                   </TouchableOpacity>
                 )}
 
-                {/* Measurements */}
+                {/* Measurement inputs — uses activeMeasurements based on gender */}
                 <Text style={styles.modalSection}>📏  MEASUREMENTS ({profile?.measureUnit || 'cm'})</Text>
                 <View style={styles.modalMeasureGrid}>
                   {activeMeasurements.map(m => (
                     <View key={m.key} style={styles.modalMeasureField}>
                       <Text style={styles.modalMeasureLabel}>{m.label}</Text>
                       <View style={styles.modalMeasureInputRow}>
+                        {/* Merges new value into existing measurements object */}
                         <TextInput
                           style={styles.modalMeasureInput}
                           placeholder="0"
@@ -365,7 +409,7 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
                   ))}
                 </View>
 
-                {/* Note */}
+                {/* Optional note */}
                 <Text style={styles.modalSection}>📝  NOTE (optional)</Text>
                 <TextInput
                   style={styles.noteInput}
@@ -377,7 +421,7 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
                   maxLength={200}
                 />
 
-                {/* Buttons */}
+                {/* Save button — dims while saving */}
                 <TouchableOpacity
                   style={[styles.saveEntryBtn, savingEntry && { opacity: 0.5 }]}
                   onPress={handleSaveEntry}
@@ -389,6 +433,7 @@ export const ProgressChartsScreen = ({ navigation }: any) => {
                   }
                 </TouchableOpacity>
 
+                {/* Cancel — closes modal and resets all fields */}
                 <TouchableOpacity style={{ alignItems: 'center', marginBottom: 20 }} onPress={() => { setModalVisible(false); resetModal(); }}>
                   <Text style={{ color: '#5a7fa8', fontSize: 14 }}>Cancel</Text>
                 </TouchableOpacity>
@@ -427,7 +472,7 @@ const styles = StyleSheet.create({
   },
   cardLabel: { color: '#5a7fa8', fontSize: 11, fontWeight: '800', letterSpacing: 2, marginBottom: 16 },
 
-  // Chart
+  // Weight chart
   chartRow: { flexDirection: 'row', marginBottom: 12 },
   yAxis: { width: 38, justifyContent: 'space-between', paddingRight: 6 },
   axisLabel: { color: '#2a4a7f', fontSize: 9, fontWeight: '600', textAlign: 'right' },
@@ -447,22 +492,16 @@ const styles = StyleSheet.create({
   emptyBtn: { backgroundColor: '#4A9EFF', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12 },
   emptyBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
 
-  // Timeline
-  timelineEntry: {
-    paddingVertical: 16,
-    borderBottomWidth: 1, borderBottomColor: '#1a3a6b',
-  },
+  // Timeline entry
+  timelineEntry: { paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#1a3a6b' },
   entryHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   entryDateBadge: { backgroundColor: '#1a3a6b', borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 },
   entryDateText: { color: '#4A9EFF', fontSize: 12, fontWeight: '700' },
   deleteBtn: { fontSize: 18 },
-
   entryPhoto: { width: '100%', height: 180, borderRadius: 12, marginBottom: 10, resizeMode: 'cover' },
-
   entryWeightRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 10, gap: 8 },
   entryWeightIcon: { fontSize: 18 },
   entryWeightValue: { color: '#fff', fontSize: 20, fontWeight: '800' },
-
   entryMeasureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 8 },
   entryMeasureChip: {
     backgroundColor: '#0a1628', borderRadius: 10, padding: 8,
@@ -472,10 +511,9 @@ const styles = StyleSheet.create({
   entryMeasureVal: { color: '#fff', fontSize: 15, fontWeight: '800' },
   entryMeasureUnit: { color: '#5a7fa8', fontSize: 9, fontWeight: '600' },
   entryMeasureKey: { color: '#26de81', fontSize: 9, fontWeight: '700', marginTop: 2, textAlign: 'center' },
-
   entryNote: { color: '#8ab4f8', fontSize: 13, fontStyle: 'italic', marginTop: 6 },
 
-  // Modal
+  // New entry modal (bottom sheet)
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalSheet: {
     backgroundColor: '#0a1628', borderTopLeftRadius: 24, borderTopRightRadius: 24,
@@ -483,7 +521,6 @@ const styles = StyleSheet.create({
   },
   modalHandle: { width: 40, height: 4, backgroundColor: '#1a3a6b', borderRadius: 2, alignSelf: 'center', marginBottom: 20 },
   modalTitle: { color: '#5a7fa8', fontSize: 11, fontWeight: '800', letterSpacing: 2, textAlign: 'center', marginBottom: 20 },
-
   modalSection: { color: '#8ab4f8', fontSize: 11, fontWeight: '800', letterSpacing: 1.5, marginBottom: 10, marginTop: 16 },
 
   weightInputRow: {
@@ -505,10 +542,7 @@ const styles = StyleSheet.create({
   modalMeasureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   modalMeasureField: { width: '47%' },
   modalMeasureLabel: { color: '#8ab4f8', fontSize: 11, fontWeight: '600', marginBottom: 4 },
-  modalMeasureInputRow: {
-    backgroundColor: '#0d1f3c', borderRadius: 10,
-    borderWidth: 1, borderColor: '#1a3a6b',
-  },
+  modalMeasureInputRow: { backgroundColor: '#0d1f3c', borderRadius: 10, borderWidth: 1, borderColor: '#1a3a6b' },
   modalMeasureInput: { padding: 10, fontSize: 15, color: '#fff' },
 
   noteInput: {

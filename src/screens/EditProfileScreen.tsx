@@ -7,9 +7,13 @@ import { colors, spacing, borderRadius } from '../theme/colors';
 import { profileAPI, uploadAPI, authAPI } from '../services/api';
 import { pickImage, convertImageToBase64 } from '../utils/imagePicker';
 
+// Emoji options shown in the avatar picker (used when no photo is set)
 const AVATARS = ['👤', '😊', '💪', '🔥', '⚡', '🙏', '✨', '🎯', '🏃', '🏋️', '🤸', '🧘'];
+
+// Selectable fitness goal options
 const FITNESS_GOALS = ['Weight Loss', 'Muscle Gain', 'Maintenance', 'General Fitness', 'Athletic Performance'];
 
+// Body measurement fields shown when gender is set to Male
 const MALE_MEASUREMENTS = [
   { key: 'chest',       label: 'Chest',        icon: '📏' },
   { key: 'shoulders',   label: 'Shoulders',    icon: '📏' },
@@ -25,6 +29,7 @@ const MALE_MEASUREMENTS = [
   { key: 'forearm',     label: 'Forearm',      icon: '💪' },
 ];
 
+// Body measurement fields shown when gender is set to Female
 const FEMALE_MEASUREMENTS = [
   { key: 'bust',        label: 'Bust',         icon: '📏' },
   { key: 'underBust',   label: 'Under Bust',   icon: '📏' },
@@ -40,50 +45,55 @@ const FEMALE_MEASUREMENTS = [
   { key: 'shoulders',   label: 'Shoulders',    icon: '📏' },
 ];
 
+// Password validation rules — each has a label and a test function
 const PASSWORD_RULES = [
-  { label: 'At least 9 characters',          test: (p: string) => p.length >= 9 },
-  { label: 'One uppercase letter',            test: (p: string) => /[A-Z]/.test(p) },
-  { label: 'One number',                      test: (p: string) => /[0-9]/.test(p) },
-  { label: 'One special character',           test: (p: string) => /[^A-Za-z0-9]/.test(p) },
+  { label: 'At least 9 characters',  test: (p: string) => p.length >= 9 },
+  { label: 'One uppercase letter',   test: (p: string) => /[A-Z]/.test(p) },
+  { label: 'One number',             test: (p: string) => /[0-9]/.test(p) },
+  { label: 'One special character',  test: (p: string) => /[^A-Za-z0-9]/.test(p) },
 ];
 
 export const EditProfileScreen = ({ route, navigation }: any) => {
   const { profile } = route.params || {};
 
-  // Profile fields
-  const [avatar, setAvatar] = useState(profile?.avatar || '👤');
+  // ── Profile field state (pre-filled from existing profile) ────────────────
+  const [avatar, setAvatar]               = useState(profile?.avatar || '👤');
   const [profilePicture, setProfilePicture] = useState(profile?.profilePicture || null);
-  const [bio, setBio] = useState(profile?.bio || '');
-  const [fitnessGoal, setFitnessGoal] = useState(profile?.fitnessGoal || 'General Fitness');
+  const [bio, setBio]                     = useState(profile?.bio || '');
+  const [fitnessGoal, setFitnessGoal]     = useState(profile?.fitnessGoal || 'General Fitness');
   const [currentWeight, setCurrentWeight] = useState(profile?.currentWeight?.toString() || '');
-  const [targetWeight, setTargetWeight] = useState(profile?.targetWeight?.toString() || '');
-  const [height, setHeight] = useState(profile?.height?.toString() || '');
-  const [weightUnit, setWeightUnit] = useState(profile?.weightUnit || 'kg');
-  const [heightUnit, setHeightUnit] = useState(profile?.heightUnit || 'cm');
-  const [loading, setLoading] = useState(false);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [targetWeight, setTargetWeight]   = useState(profile?.targetWeight?.toString() || '');
+  const [height, setHeight]               = useState(profile?.height?.toString() || '');
+  const [weightUnit, setWeightUnit]       = useState(profile?.weightUnit || 'kg');
+  const [heightUnit, setHeightUnit]       = useState(profile?.heightUnit || 'cm');
+  const [loading, setLoading]             = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false); // separate from main loading so spinner is localised
 
-  // Body measurements
-  const [gender, setGender] = useState<'male' | 'female'>(profile?.gender || 'male');
+  // ── Body measurement state ────────────────────────────────────────────────
+  const [gender, setGender]           = useState<'male' | 'female'>(profile?.gender || 'male');
   const [measureUnit, setMeasureUnit] = useState<'cm' | 'inches'>('cm');
+  // Key-value map of measurement name → value string, e.g. { waist: '80', chest: '100' }
   const [measurements, setMeasurements] = useState<Record<string, string>>(
     profile?.measurements || {}
   );
 
-  // Change password modal
-  const [passwordVisible, setPasswordVisible] = useState(false);
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [showCurrentPw, setShowCurrentPw] = useState(false);
-  const [showNewPw, setShowNewPw] = useState(false);
-  const [showConfirmPw, setShowConfirmPw] = useState(false);
-  const [passwordLoading, setPasswordLoading] = useState(false);
-  const [passwordError, setPasswordError] = useState('');
+  // ── Change password modal state ───────────────────────────────────────────
+  const [passwordVisible, setPasswordVisible]   = useState(false);
+  const [currentPassword, setCurrentPassword]   = useState('');
+  const [newPassword, setNewPassword]           = useState('');
+  const [confirmPassword, setConfirmPassword]   = useState('');
+  const [showCurrentPw, setShowCurrentPw]       = useState(false); // toggles password visibility
+  const [showNewPw, setShowNewPw]               = useState(false);
+  const [showConfirmPw, setShowConfirmPw]       = useState(false);
+  const [passwordLoading, setPasswordLoading]   = useState(false);
+  const [passwordError, setPasswordError]       = useState('');
 
+  // Switches measurement fields based on selected gender
   const activeMeasurements = gender === 'male' ? MALE_MEASUREMENTS : FEMALE_MEASUREMENTS;
 
   // ── Image Handlers ────────────────────────────────────────────────────────
+
+  // Picks an image from camera or gallery, converts to base64, and uploads it
   const handlePickImage = async (fromCamera: boolean) => {
     try {
       const uri = await pickImage(fromCamera);
@@ -92,9 +102,8 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
         const base64 = await convertImageToBase64(uri);
         if (base64) {
           const updatedUser = await uploadAPI.uploadProfilePicture(profile._id, base64);
-          setProfilePicture(base64);
+          setProfilePicture(base64); // show new photo immediately without re-fetching
           Alert.alert('Success', 'Profile picture uploaded!');
-
         }
       }
     } catch (error) {
@@ -104,6 +113,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
     }
   };
 
+  // Prompts for confirmation before removing the profile picture from the server
   const handleRemovePhoto = async () => {
     Alert.alert('Remove Photo', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
@@ -113,8 +123,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
           try {
             setUploadingPhoto(true);
             const updatedUser = await uploadAPI.removeProfilePicture(profile._id);
-            setProfilePicture(null);
-
+            setProfilePicture(null); // revert to emoji avatar
           } catch {
             Alert.alert('Error', 'Failed to remove photo');
           } finally {
@@ -125,24 +134,28 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
     ]);
   };
 
+  // Shows an action sheet with camera / gallery / remove options
   const showImageOptions = () => {
     Alert.alert('Profile Picture', 'Choose an option', [
-      { text: 'Take Photo', onPress: () => handlePickImage(true) },
-      { text: 'Choose from Gallery', onPress: () => handlePickImage(false) },
+      { text: 'Take Photo',           onPress: () => handlePickImage(true) },
+      { text: 'Choose from Gallery',  onPress: () => handlePickImage(false) },
+      // Only show Remove option if a photo is currently set
       ...(profilePicture ? [{ text: 'Remove Photo', style: 'destructive' as const, onPress: handleRemovePhoto }] : []),
       { text: 'Cancel', style: 'cancel' as const }
     ]);
   };
 
   // ── Save Profile ──────────────────────────────────────────────────────────
+
+  // Builds the update payload and sends it to the API
   const handleSave = async () => {
     setLoading(true);
     try {
       const updates = {
         avatar, bio: bio.trim(), fitnessGoal,
         currentWeight: currentWeight ? parseFloat(currentWeight) : null,
-        targetWeight: targetWeight ? parseFloat(targetWeight) : null,
-        height: height ? parseFloat(height) : null,
+        targetWeight:  targetWeight  ? parseFloat(targetWeight)  : null,
+        height:        height        ? parseFloat(height)        : null,
         weightUnit, heightUnit,
         gender,
         measurements,
@@ -150,7 +163,6 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
       };
       const updatedProfile = await profileAPI.updateProfile(profile._id, updates);
       Alert.alert('Success', 'Profile updated!');
-
       navigation.goBack();
     } catch {
       Alert.alert('Error', 'Failed to update profile');
@@ -160,17 +172,20 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
   };
 
   // ── Change Password ───────────────────────────────────────────────────────
+
+  // Validates all password rules before submitting to the auth API
   const handleChangePassword = async () => {
     setPasswordError('');
-    if (!currentPassword) { setPasswordError('Please enter your current password.'); return; }
+    if (!currentPassword)                               { setPasswordError('Please enter your current password.'); return; }
     if (!PASSWORD_RULES.every(r => r.test(newPassword))) { setPasswordError('New password does not meet requirements.'); return; }
-    if (newPassword !== confirmPassword) { setPasswordError('Passwords do not match.'); return; }
+    if (newPassword !== confirmPassword)                 { setPasswordError('Passwords do not match.'); return; }
 
     setPasswordLoading(true);
     try {
       await authAPI.changePassword(profile._id, currentPassword, newPassword);
       Alert.alert('Success', 'Password updated successfully!');
       setPasswordVisible(false);
+      // Clear all password fields after success
       setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
     } catch (err: any) {
       setPasswordError(err?.error || 'Failed to update password.');
@@ -183,7 +198,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
   return (
     <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
 
-      {/* Header */}
+      {/* ── Header: Cancel / Title / Save ── */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.cancelButton}>Cancel</Text>
@@ -202,15 +217,18 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>PROFILE PICTURE</Text>
           <View style={styles.photoContainer}>
+            {/* Tapping the circle opens the image options action sheet */}
             <TouchableOpacity style={styles.photoCircle} onPress={showImageOptions} disabled={uploadingPhoto}>
               {uploadingPhoto ? (
                 <ActivityIndicator size="large" color="#4A9EFF" />
               ) : profilePicture ? (
                 <Image source={{ uri: profilePicture }} style={styles.profileImage} />
               ) : (
+                // Fall back to emoji avatar if no photo is set
                 <Text style={styles.photoPlaceholder}>{avatar}</Text>
               )}
             </TouchableOpacity>
+            {/* Individual shortcut buttons for Camera / Gallery / Remove */}
             <View style={styles.photoButtons}>
               <TouchableOpacity style={styles.photoButton} onPress={() => handlePickImage(true)} disabled={uploadingPhoto}>
                 <Text style={styles.photoButtonIcon}>📷</Text>
@@ -220,6 +238,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
                 <Text style={styles.photoButtonIcon}>🖼️</Text>
                 <Text style={styles.photoButtonText}>Gallery</Text>
               </TouchableOpacity>
+              {/* Remove button only shown when a photo exists */}
               {profilePicture && (
                 <TouchableOpacity style={[styles.photoButton, styles.removeButton]} onPress={handleRemovePhoto} disabled={uploadingPhoto}>
                   <Text style={styles.photoButtonIcon}>🗑️</Text>
@@ -230,7 +249,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
-        {/* ── Avatar Emoji ── */}
+        {/* ── Avatar Emoji Picker ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>AVATAR EMOJI</Text>
           <Text style={styles.sectionSubtitle}>Shown when no photo is set</Text>
@@ -247,7 +266,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
-        {/* ── Bio ── */}
+        {/* ── Bio / Testimony ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>BIO / TESTIMONY</Text>
           <TextInput
@@ -281,7 +300,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
-        {/* ── Weight ── */}
+        {/* ── Weight (current + target, with kg/lbs toggle) ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>WEIGHT</Text>
           <View style={styles.unitToggle}>
@@ -303,7 +322,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
-        {/* ── Height ── */}
+        {/* ── Height (with cm/inches toggle) ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>HEIGHT</Text>
           <View style={styles.unitToggle}>
@@ -320,7 +339,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>BODY MEASUREMENTS</Text>
 
-          {/* Gender toggle */}
+          {/* Gender toggle — switches which measurement fields are shown */}
           <View style={styles.genderToggle}>
             <TouchableOpacity style={[styles.genderButton, gender === 'male' && styles.genderButtonActive]} onPress={() => setGender('male')}>
               <Text style={[styles.genderButtonText, gender === 'male' && styles.genderButtonTextActive]}>♂ Male</Text>
@@ -330,7 +349,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
             </TouchableOpacity>
           </View>
 
-          {/* Measurement unit */}
+          {/* Measurement unit toggle (cm / inches) */}
           <View style={[styles.unitToggle, { marginBottom: spacing.lg }]}>
             {['cm', 'inches'].map(u => (
               <TouchableOpacity key={u} style={[styles.unitButton, measureUnit === u && styles.unitButtonActive]} onPress={() => setMeasureUnit(u as 'cm' | 'inches')}>
@@ -339,7 +358,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
             ))}
           </View>
 
-          {/* Measurement fields — 2 columns */}
+          {/* 2-column grid of measurement inputs — fields depend on selected gender */}
           <View style={styles.measureGrid}>
             {activeMeasurements.map(m => (
               <View key={m.key} style={styles.measureField}>
@@ -350,6 +369,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
                     placeholder="0"
                     placeholderTextColor="#2a4a7f"
                     value={measurements[m.key] || ''}
+                    // Merges the updated field into the measurements object without overwriting others
                     onChangeText={v => setMeasurements(prev => ({ ...prev, [m.key]: v }))}
                     keyboardType="decimal-pad"
                   />
@@ -360,7 +380,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
           </View>
         </View>
 
-        {/* ── Change Password ── */}
+        {/* ── Security: Change Password ── */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>SECURITY</Text>
           <TouchableOpacity style={styles.securityRow} onPress={() => setPasswordVisible(true)}>
@@ -373,23 +393,27 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
           </TouchableOpacity>
         </View>
 
+        {/* Bottom padding so last section clears the keyboard */}
         <View style={{ height: 100 }} />
       </ScrollView>
 
+      {/* Full-screen loading overlay shown while saving the profile */}
       {loading && (
         <View style={styles.loadingOverlay}>
           <ActivityIndicator size="large" color="#4A9EFF" />
         </View>
       )}
 
-      {/* ── Change Password Modal ── */}
+      {/* ── Change Password Bottom Sheet Modal ── */}
       <Modal visible={passwordVisible} transparent animationType="slide" onRequestClose={() => setPasswordVisible(false)}>
+        {/* Tapping the dark overlay dismisses the modal */}
         <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setPasswordVisible(false)}>
+          {/* Inner card is not tappable so it doesn't dismiss when tapped */}
           <TouchableOpacity style={styles.modalSheet} activeOpacity={1}>
             <View style={styles.modalHandle} />
             <Text style={styles.modalTitle}>CHANGE PASSWORD</Text>
 
-            {/* Current password */}
+            {/* Current password input with show/hide toggle */}
             <Text style={styles.pwLabel}>Current Password</Text>
             <View style={styles.pwRow}>
               <TextInput
@@ -405,7 +429,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
               </TouchableOpacity>
             </View>
 
-            {/* New password */}
+            {/* New password input with show/hide toggle */}
             <Text style={styles.pwLabel}>New Password</Text>
             <View style={styles.pwRow}>
               <TextInput
@@ -421,13 +445,14 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
               </TouchableOpacity>
             </View>
 
-            {/* Rules */}
+            {/* Live password rule checklist — only shown once typing starts */}
             {newPassword.length > 0 && (
               <View style={styles.rulesCard}>
                 {PASSWORD_RULES.map((rule, i) => {
                   const passed = rule.test(newPassword);
                   return (
                     <View key={i} style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+                      {/* Green tick if rule passes, grey circle if not */}
                       <Text style={{ color: passed ? '#26de81' : '#2a4a7f', marginRight: 8, fontWeight: '800' }}>{passed ? '✓' : '○'}</Text>
                       <Text style={{ color: passed ? '#26de81' : '#5a7fa8', fontSize: 12 }}>{rule.label}</Text>
                     </View>
@@ -436,7 +461,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
               </View>
             )}
 
-            {/* Confirm password */}
+            {/* Confirm password input with show/hide toggle */}
             <Text style={styles.pwLabel}>Confirm New Password</Text>
             <View style={styles.pwRow}>
               <TextInput
@@ -452,6 +477,7 @@ export const EditProfileScreen = ({ route, navigation }: any) => {
               </TouchableOpacity>
             </View>
 
+            {/* Error message shown if validation fails or API returns an error */}
             {!!passwordError && (
               <View style={styles.errorBox}>
                 <Text style={styles.errorText}>⚠️ {passwordError}</Text>
@@ -504,7 +530,7 @@ const styles = StyleSheet.create({
   },
   sectionSubtitle: { fontSize: 13, color: '#5a7fa8', marginBottom: spacing.md },
 
-  // Photo
+  // Profile photo
   photoContainer: { alignItems: 'center' },
   photoCircle: {
     width: 110, height: 110, borderRadius: 55,
@@ -523,7 +549,7 @@ const styles = StyleSheet.create({
   photoButtonIcon: { fontSize: 22, marginBottom: 4 },
   photoButtonText: { fontSize: 12, color: '#8ab4f8', fontWeight: '600' },
 
-  // Avatar
+  // Emoji avatar picker grid
   avatarsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   avatarOption: {
     width: 56, height: 56, borderRadius: 28,
@@ -533,7 +559,7 @@ const styles = StyleSheet.create({
   avatarOptionSelected: { borderColor: '#4A9EFF', backgroundColor: '#4A9EFF22' },
   avatarOptionText: { fontSize: 28 },
 
-  // Bio
+  // Bio text area
   textArea: {
     backgroundColor: '#0d1f3c', borderRadius: borderRadius.small,
     padding: spacing.md, fontSize: 15, minHeight: 100,
@@ -542,7 +568,7 @@ const styles = StyleSheet.create({
   },
   characterCount: { fontSize: 12, color: '#5a7fa8', textAlign: 'right', marginTop: 6 },
 
-  // Goals
+  // Fitness goal selector
   goalsGrid: { gap: spacing.sm },
   goalOption: {
     backgroundColor: '#0d1f3c', padding: spacing.md,
@@ -552,7 +578,7 @@ const styles = StyleSheet.create({
   goalOptionText: { fontSize: 15, color: '#8ab4f8', textAlign: 'center' },
   goalOptionTextSelected: { fontWeight: '700', color: '#4A9EFF' },
 
-  // Unit toggle
+  // Shared unit toggle (kg/lbs, cm/inches)
   unitToggle: {
     flexDirection: 'row', marginBottom: spacing.md,
     backgroundColor: '#0d1f3c', borderRadius: borderRadius.small,
@@ -563,7 +589,7 @@ const styles = StyleSheet.create({
   unitButtonText: { fontSize: 14, fontWeight: '600', color: '#5a7fa8' },
   unitButtonTextActive: { color: '#fff' },
 
-  // Inputs
+  // Numeric inputs (weight, height)
   inputRow: { flexDirection: 'row', gap: spacing.md },
   inputGroup: { flex: 1 },
   inputLabel: { fontSize: 13, color: '#5a7fa8', marginBottom: 6 },
@@ -573,7 +599,7 @@ const styles = StyleSheet.create({
     borderWidth: 1, borderColor: '#1a3a6b',
   },
 
-  // Gender toggle
+  // Gender toggle (Male / Female)
   genderToggle: {
     flexDirection: 'row', marginBottom: spacing.md,
     backgroundColor: '#0d1f3c', borderRadius: borderRadius.small,
@@ -584,7 +610,7 @@ const styles = StyleSheet.create({
   genderButtonText: { fontSize: 15, fontWeight: '700', color: '#5a7fa8' },
   genderButtonTextActive: { color: '#fff' },
 
-  // Measurement grid
+  // 2-column measurement input grid
   measureGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   measureField: { width: '47%' },
   measureLabel: { fontSize: 12, color: '#8ab4f8', marginBottom: 6, fontWeight: '600' },
@@ -596,7 +622,7 @@ const styles = StyleSheet.create({
   measureInput: { flex: 1, padding: 10, fontSize: 15, color: '#fff' },
   measureUnit: { paddingHorizontal: 10, color: '#5a7fa8', fontSize: 12, fontWeight: '600' },
 
-  // Security row
+  // Security / change password row
   securityRow: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#0d1f3c', borderRadius: 12, padding: spacing.md,
@@ -607,14 +633,14 @@ const styles = StyleSheet.create({
   securityRowSub: { fontSize: 12, color: '#5a7fa8', marginTop: 2 },
   securityChevron: { fontSize: 22, color: '#5a7fa8' },
 
-  // Loading overlay
+  // Full-screen semi-transparent overlay shown during save
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center', alignItems: 'center',
   },
 
-  // Password modal
+  // Change password bottom sheet modal
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'flex-end' },
   modalSheet: {
     backgroundColor: '#0a1628', borderTopLeftRadius: 24, borderTopRightRadius: 24,

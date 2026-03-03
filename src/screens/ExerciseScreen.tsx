@@ -4,6 +4,9 @@ import { useAuth } from '../context/AuthContext';
 import { workoutAPI } from '../services/api';
 import { useDailyQuote } from '../hooks/useDailyQuote';
 
+// Preset workout plans shown on this screen
+// Each workout contains exercises with pre-defined sets, reps, and weights
+// completed: false — all sets start as incomplete when a workout is created
 const WORKOUTS = [
   {
     id: 1, title: 'Upper Body Strength', description: 'Chest, shoulders & triceps',
@@ -50,24 +53,32 @@ const WORKOUTS = [
 export const ExerciseScreen = ({ navigation }: any) => {
   const { user } = useAuth();
   const quote = useDailyQuote();
+
+  // Tracks which workout card is currently loading (by workout id); null = none loading
   const [loadingId, setLoadingId] = useState<number | null>(null);
 
+  // Creates the workout in the database then navigates to the active workout screen
   const handleStartWorkout = async (workout: any) => {
     try {
       if (!user?.id) { Alert.alert('Error', 'Please login to start a workout'); return; }
-      setLoadingId(workout.id);
-      const createdWorkout = await workoutAPI.createWorkout({ userId: user.id, title: workout.title, exercises: workout.exercises });
+      setLoadingId(workout.id); // show spinner on the tapped card only
+      const createdWorkout = await workoutAPI.createWorkout({
+        userId: user.id,
+        title: workout.title,
+        exercises: workout.exercises,
+      });
       navigation.navigate('ExerciseProgress', { workout: createdWorkout });
     } catch {
       Alert.alert('Error', 'Failed to start workout. Please try again.');
     } finally {
-      setLoadingId(null);
+      setLoadingId(null); // clear spinner regardless of success or failure
     }
   };
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+
+      {/* ── Header: Back / Title / Templates shortcut ── */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backText}>← Back</Text>
@@ -83,19 +94,22 @@ export const ExerciseScreen = ({ navigation }: any) => {
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
 
-        {/* Faith Card */}
-                <View style={styles.faithCard}>
-                  <Text style={styles.faithText}>"{quote.text}"</Text>
-                  <Text style={styles.faithRef}>— {quote.author}</Text>
-                </View>
+        {/* ── Daily Quote Card ── */}
+        <View style={styles.faithCard}>
+          <Text style={styles.faithText}>"{quote.text}"</Text>
+          <Text style={styles.faithRef}>— {quote.author}</Text>
+        </View>
 
-        {/* Workout Cards */}
+        {/* ── Preset Workout Cards ── */}
         {WORKOUTS.map((workout) => {
+          // Sum all sets across every exercise for the stats bar
           const totalSets = workout.exercises.reduce((t, e) => t + e.sets.length, 0);
-          const isLoading = loadingId === workout.id;
+          const isLoading = loadingId === workout.id; // true only for the card being started
+
           return (
             <View key={workout.id} style={[styles.workoutCard, { borderTopColor: workout.color }]}>
-              {/* Card Header */}
+
+              {/* Card header: emoji + title + description */}
               <View style={styles.cardHeader}>
                 <Text style={styles.workoutEmoji}>{workout.emoji}</Text>
                 <View style={styles.workoutInfo}>
@@ -104,7 +118,7 @@ export const ExerciseScreen = ({ navigation }: any) => {
                 </View>
               </View>
 
-              {/* Stats */}
+              {/* Quick stats: exercises / sets / estimated duration */}
               <View style={styles.statsRow}>
                 {[
                   { value: workout.exercises.length, label: 'exercises' },
@@ -116,12 +130,13 @@ export const ExerciseScreen = ({ navigation }: any) => {
                       <Text style={[styles.statValue, { color: workout.color }]}>{stat.value}</Text>
                       <Text style={styles.statLabel}>{stat.label}</Text>
                     </View>
+                    {/* Vertical divider between stats, skipped after the last one */}
                     {i < 2 && <View style={styles.statDivider} />}
                   </React.Fragment>
                 ))}
               </View>
 
-              {/* Exercises Preview */}
+              {/* Exercise name list shown as a preview inside the card */}
               <View style={styles.exercisePreview}>
                 {workout.exercises.map((ex, i) => (
                   <Text key={i} style={styles.exerciseItem}>
@@ -130,7 +145,8 @@ export const ExerciseScreen = ({ navigation }: any) => {
                 ))}
               </View>
 
-              {/* Start Button */}
+              {/* Start button — shows spinner while this card's workout is being created */}
+              {/* All other cards are disabled while any workout is loading */}
               <TouchableOpacity
                 style={[styles.startBtn, { backgroundColor: workout.color }]}
                 onPress={() => handleStartWorkout(workout)}
@@ -146,7 +162,7 @@ export const ExerciseScreen = ({ navigation }: any) => {
           );
         })}
 
-        {/* Templates Link */}
+        {/* ── Templates Banner — links to saved workout templates ── */}
         <TouchableOpacity
           style={styles.templatesCard}
           onPress={() => navigation.navigate('WorkoutTemplates')}
@@ -184,6 +200,7 @@ const styles = StyleSheet.create({
 
   content: { padding: 16, paddingBottom: 40 },
 
+  // Daily quote card
   faithCard: {
     backgroundColor: '#0d1f3c', borderRadius: 16, padding: 18,
     marginBottom: 16, borderLeftWidth: 3, borderLeftColor: '#4A9EFF',
@@ -191,6 +208,7 @@ const styles = StyleSheet.create({
   faithText: { color: '#c8d8f0', fontSize: 14, fontStyle: 'italic', lineHeight: 22, marginBottom: 8 },
   faithRef: { color: '#4A9EFF', fontSize: 12, fontWeight: '700', textAlign: 'right' },
 
+  // Workout card (border colour injected per card from WORKOUTS data)
   workoutCard: {
     backgroundColor: '#0d1f3c', borderRadius: 16,
     padding: 18, marginBottom: 14,
@@ -202,6 +220,7 @@ const styles = StyleSheet.create({
   workoutTitle: { color: '#fff', fontSize: 18, fontWeight: '800', marginBottom: 4 },
   workoutDesc: { color: '#5a7fa8', fontSize: 13 },
 
+  // Stats bar (exercises / sets / mins)
   statsRow: {
     flexDirection: 'row', backgroundColor: '#0a1628',
     borderRadius: 12, padding: 14, marginBottom: 14,
@@ -211,16 +230,19 @@ const styles = StyleSheet.create({
   statLabel: { color: '#5a7fa8', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
   statDivider: { width: 1, backgroundColor: '#1a3a6b', marginHorizontal: 8 },
 
+  // Exercise preview list
   exercisePreview: { marginBottom: 16 },
   exerciseItem: { color: '#8ab4f8', fontSize: 13, marginBottom: 4 },
   exerciseSets: { color: '#5a7fa8', fontSize: 12 },
 
+  // Start workout button
   startBtn: {
     borderRadius: 12, padding: 14,
     alignItems: 'center', justifyContent: 'center',
   },
   startBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 
+  // Templates banner card at the bottom
   templatesCard: {
     flexDirection: 'row', alignItems: 'center',
     backgroundColor: '#0d1f3c', borderRadius: 16,

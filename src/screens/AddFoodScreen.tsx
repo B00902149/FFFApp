@@ -5,6 +5,7 @@ import {
 } from 'react-native';
 import { nutritionAPI } from '../services/api';
 
+// Quick-select serving size multipliers shown as buttons (½x, 1x, 1.5x, 2x)
 const SERVING_PRESETS = [
   { label: '½',    multiplier: 0.5 },
   { label: '1x',   multiplier: 1 },
@@ -12,28 +13,33 @@ const SERVING_PRESETS = [
   { label: '2x',   multiplier: 2 },
 ];
 
+// Unit options for the custom amount input
 const UNIT_OPTIONS = ['g', 'ml', 'oz', 'cup', 'bowl', 'glass'];
 
 export const AddFoodScreen = ({ route, navigation }: any) => {
+  // mealType: e.g. 'Breakfast', 'Lunch' — onFoodAdded: callback to update parent screen
   const { mealType, onFoodAdded } = route.params;
-  const [searchQuery, setSearchQuery] = useState('');
+
+  const [searchQuery, setSearchQuery]     = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [searching, setSearching] = useState(false);
-  const [selectedFood, setSelectedFood] = useState<any>(null);
+  const [searching, setSearching]         = useState(false);
+  const [selectedFood, setSelectedFood]   = useState<any>(null);
 
-  // Serving controls
-  const [multiplier, setMultiplier] = useState(1);
-  const [customGrams, setCustomGrams] = useState('');
-  const [selectedUnit, setSelectedUnit] = useState('g');
+  // Serving size controls
+  const [multiplier, setMultiplier]     = useState(1);       // preset multiplier (e.g. 1x, 2x)
+  const [customGrams, setCustomGrams]   = useState('');      // manual amount typed by user
+  const [selectedUnit, setSelectedUnit] = useState('g');     // unit for the custom amount
 
+  // Debounce search — waits 800ms after user stops typing before triggering API call
   useEffect(() => {
     const timer = setTimeout(() => {
       if (searchQuery.trim().length > 2) handleSearch();
       else setSearchResults([]);
     }, 800);
-    return () => clearTimeout(timer);
+    return () => clearTimeout(timer); // clear timer if user keeps typing
   }, [searchQuery]);
 
+  // Calls the USDA food search API and updates results list
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     setSearching(true);
@@ -48,6 +54,7 @@ export const AddFoodScreen = ({ route, navigation }: any) => {
     }
   };
 
+  // Sets a food as selected and resets all serving controls to defaults
   const selectFood = (food: any) => {
     setSelectedFood(food);
     setMultiplier(1);
@@ -55,51 +62,56 @@ export const AddFoodScreen = ({ route, navigation }: any) => {
     setSelectedUnit('g');
   };
 
-  // Calculate adjusted macros
+  // Returns macro/calorie value adjusted by serving size
+  // If custom grams entered: scales from per-100g base values
+  // Otherwise: multiplies base value by the preset multiplier
   const getAdjustedValue = (base: number) => {
     if (customGrams && !isNaN(Number(customGrams))) {
-      // Custom grams: assume base values are per 100g
       return Math.round((base / 100) * Number(customGrams));
     }
     return Math.round(base * multiplier);
   };
 
+  // Builds a human-readable serving label for the food entry (e.g. "150g" or "1x serving (100g)")
   const getServingLabel = () => {
     if (customGrams) return `${customGrams}${selectedUnit}`;
     const preset = SERVING_PRESETS.find(p => p.multiplier === multiplier);
     return preset ? `${preset.label} serving (${selectedFood?.servingSize})` : selectedFood?.servingSize;
   };
 
+  // Passes the adjusted food entry back to the parent screen and closes this screen
   const handleAddFood = () => {
     if (!selectedFood) return;
     onFoodAdded(mealType, {
-      name: selectedFood.name,
-      calories: getAdjustedValue(selectedFood.calories),
-      protein:  getAdjustedValue(selectedFood.protein || 0),
-      carbs:    getAdjustedValue(selectedFood.carbs || 0),
-      fat:      getAdjustedValue(selectedFood.fat || 0),
+      name:        selectedFood.name,
+      calories:    getAdjustedValue(selectedFood.calories),
+      protein:     getAdjustedValue(selectedFood.protein || 0),
+      carbs:       getAdjustedValue(selectedFood.carbs || 0),
+      fat:         getAdjustedValue(selectedFood.fat || 0),
       servingSize: getServingLabel(),
     });
     navigation.goBack();
   };
 
   return (
+    // Prevents keyboard from covering inputs on both iOS and Android
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Header */}
+      {/* ── Header: Cancel / Title / Add ── */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.cancelBtn}>Cancel</Text>
         </TouchableOpacity>
         <Text style={styles.title}>Add to {mealType}</Text>
+        {/* Add button is disabled until a food is selected */}
         <TouchableOpacity onPress={handleAddFood} disabled={!selectedFood}>
           <Text style={[styles.addBtn, !selectedFood && styles.addBtnDisabled]}>Add</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Search Bar */}
+      {/* ── Search Bar ── */}
       <View style={styles.searchBar}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
@@ -116,19 +128,21 @@ export const AddFoodScreen = ({ route, navigation }: any) => {
 
       <ScrollView style={styles.scroll} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
 
-        {/* Selected Food Card */}
+        {/* ── Selected Food Card: shown after user picks a food ── */}
         {selectedFood && (
           <View style={styles.selectedCard}>
-            {/* Food Name & Change */}
+
+            {/* Top row: selected badge + change button */}
             <View style={styles.selectedTop}>
               <Text style={styles.selectedLabel}>✓ SELECTED</Text>
               <TouchableOpacity onPress={() => setSelectedFood(null)}>
                 <Text style={styles.changeBtn}>Change</Text>
               </TouchableOpacity>
             </View>
+
             <Text style={styles.selectedName}>{selectedFood.name}</Text>
 
-            {/* Adjusted Macros */}
+            {/* Live macro display — updates as user changes serving size */}
             <View style={styles.macroRow}>
               <View style={styles.calChip}>
                 <Text style={styles.calValue}>{getAdjustedValue(selectedFood.calories)}</Text>
@@ -146,12 +160,13 @@ export const AddFoodScreen = ({ route, navigation }: any) => {
               ))}
             </View>
 
-            {/* Serving Presets */}
+            {/* Preset serving buttons (½x, 1x, 1.5x, 2x) */}
             <Text style={styles.servingTitle}>SERVING SIZE</Text>
             <View style={styles.presetRow}>
               {SERVING_PRESETS.map(p => (
                 <TouchableOpacity
                   key={p.label}
+                  // Active style applied when this preset is selected and no custom amount is typed
                   style={[styles.presetBtn, multiplier === p.multiplier && !customGrams && styles.presetBtnActive]}
                   onPress={() => { setMultiplier(p.multiplier); setCustomGrams(''); }}
                 >
@@ -162,7 +177,7 @@ export const AddFoodScreen = ({ route, navigation }: any) => {
               ))}
             </View>
 
-            {/* Custom Amount */}
+            {/* Custom amount input + unit selector */}
             <Text style={styles.servingTitle}>CUSTOM AMOUNT</Text>
             <View style={styles.customRow}>
               <TextInput
@@ -173,6 +188,7 @@ export const AddFoodScreen = ({ route, navigation }: any) => {
                 onChangeText={setCustomGrams}
                 keyboardType="decimal-pad"
               />
+              {/* Horizontally scrollable unit options */}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.unitScroll}>
                 {UNIT_OPTIONS.map(unit => (
                   <TouchableOpacity
@@ -188,11 +204,12 @@ export const AddFoodScreen = ({ route, navigation }: any) => {
               </ScrollView>
             </View>
 
+            {/* Shows the original serving size from the database for reference */}
             <Text style={styles.servingHint}>Base: {selectedFood.servingSize}</Text>
           </View>
         )}
 
-        {/* Search Results */}
+        {/* ── Search Results List ── */}
         {!selectedFood && searchResults.length > 0 && (
           <View>
             <Text style={styles.resultsLabel}>RESULTS ({searchResults.length})</Text>
@@ -203,6 +220,7 @@ export const AddFoodScreen = ({ route, navigation }: any) => {
                   <Text style={styles.resultCals}>{food.calories} cal</Text>
                 </View>
                 <Text style={styles.resultServing}>{food.servingSize}</Text>
+                {/* Compact macro badges (P / C / F) */}
                 <View style={styles.resultMacros}>
                   {[
                     { label: 'P', value: food.protein },
@@ -219,7 +237,7 @@ export const AddFoodScreen = ({ route, navigation }: any) => {
           </View>
         )}
 
-        {/* Searching */}
+        {/* ── Loading state ── */}
         {searching && (
           <View style={styles.stateBox}>
             <ActivityIndicator size="large" color="#4A9EFF" />
@@ -227,7 +245,7 @@ export const AddFoodScreen = ({ route, navigation }: any) => {
           </View>
         )}
 
-        {/* No Results */}
+        {/* ── No results found state ── */}
         {!searching && searchQuery.length > 2 && searchResults.length === 0 && (
           <View style={styles.stateBox}>
             <Text style={styles.stateEmoji}>🔍</Text>
@@ -236,7 +254,7 @@ export const AddFoodScreen = ({ route, navigation }: any) => {
           </View>
         )}
 
-        {/* Initial State */}
+        {/* ── Initial empty state with USDA branding and example searches ── */}
         {searchQuery.length === 0 && (
           <View style={styles.stateBox}>
             <Image
@@ -246,6 +264,7 @@ export const AddFoodScreen = ({ route, navigation }: any) => {
             />
             <Text style={styles.stateTitle}>Search USDA Food Database</Text>
             <Text style={styles.stateText}>400,000+ foods with accurate nutrition data</Text>
+            {/* Tappable example queries to help users get started */}
             <View style={styles.examplesCard}>
               <Text style={styles.examplesTitle}>TRY SEARCHING</Text>
               {['chicken breast', 'scrambled eggs', 'brown rice', 'banana'].map(e => (
@@ -257,7 +276,7 @@ export const AddFoodScreen = ({ route, navigation }: any) => {
           </View>
         )}
 
-        {/* Min chars hint */}
+        {/* ── Hint: shown when query is 1–2 chars (too short to search) ── */}
         {searchQuery.length > 0 && searchQuery.length <= 2 && (
           <View style={styles.hintCard}>
             <Text style={styles.hintText}>💡 Type at least 3 characters to search</Text>
@@ -293,7 +312,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: 16, paddingBottom: 60 },
 
-  // Selected Card
+  // Selected Food Card
   selectedCard: {
     backgroundColor: '#0d1f3c', borderRadius: 16,
     padding: 18, marginBottom: 14,
@@ -318,7 +337,7 @@ const styles = StyleSheet.create({
   macroChipValue: { color: '#fff', fontSize: 16, fontWeight: '800' },
   macroChipLabel: { color: '#5a7fa8', fontSize: 10, marginTop: 2 },
 
-  // Serving
+  // Serving size controls
   servingTitle: {
     color: '#5a7fa8', fontSize: 11, fontWeight: '700',
     letterSpacing: 2, marginBottom: 10,
@@ -351,7 +370,7 @@ const styles = StyleSheet.create({
   unitTextActive: { color: '#fff' },
   servingHint: { color: '#2a4a7f', fontSize: 11, fontStyle: 'italic', marginTop: 4 },
 
-  // Results
+  // Search results
   resultsLabel: { color: '#5a7fa8', fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 10 },
   resultCard: {
     backgroundColor: '#0d1f3c', borderRadius: 14,
@@ -366,7 +385,7 @@ const styles = StyleSheet.create({
   miniChip: { backgroundColor: '#1a3a6b', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   miniChipText: { color: '#8ab4f8', fontSize: 11, fontWeight: '600' },
 
-  // States
+  // Empty / loading states
   stateBox: { alignItems: 'center', paddingVertical: 40 },
   stateEmoji: { fontSize: 64, marginBottom: 16 },
   stateTitle: { color: '#fff', fontSize: 18, fontWeight: '800', marginBottom: 8 },

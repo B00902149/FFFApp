@@ -28,7 +28,7 @@ A cross-platform mobile fitness app built with React Native (Expo), integrating 
 |---------|-----------|
 | ![Profile](screenshots/Profile.png) | ![Search](screenshots/Search.png) |
 
-| ExerciseDemo | AddPost| Macros |
+| ExerciseDemo | AddPost | Macros |
 |---------|--------------|------------|
 | ![ExerciseDemo](screenshots/ExerciseDemo.png) | ![AddPost](screenshots/AddPost.png) | ![Macros](screenshots/Macros.png)| |
 

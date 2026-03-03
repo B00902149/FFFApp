@@ -10,7 +10,7 @@ A cross-platform mobile fitness app built with React Native (Expo), integrating 
 
 [![FFF App Demo](https://img.youtube.com/vi/B0vKgBGfV-c/maxresdefault.jpg)](https://youtu.be/B0vKgBGfV-c)
 
-▶️ **[Watch Full Demo on YouTube](https://youtu.be/B0vKgBGfV-c)**
+▶️ **[Watch Full Demo on YouTube](https://youtu.be/Ksfxh4NRMzQ)**
 
 ---
 

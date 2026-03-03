@@ -16,21 +16,17 @@ A cross-platform mobile fitness app built with React Native (Expo), integrating 
 
 ## 📱 Screenshots
 
-| Login | Dashboard | My Health |
+| Signup | Dashboard | My Health |
 |-------|-----------|-----------|
-| ![Login](screenshots/login.png) | ![Dashboard](screenshots/dashboard.png) | ![Health](screenshots/health.png) |
+| ![Signup](screenshots/Signup.png) | ![Dashboard](screenshots/Dashboard.png) | ![Health](screenshots/MyHealth.png) |
 
 | Exercise | Nutrition | Community |
 |----------|-----------|-----------|
-| ![Exercise](screenshots/exercise.png) | ![Nutrition](screenshots/nutrition.png) | ![Community](screenshots/community.png) |
+| ![Exercise](screenshots/Exercise.png) | ![Nutrition](screenshots/Nutrition.png) | ![Community](screenshots/Community.png) |
 
-| Profile                             | Macros                            | Search                            |
-|-------------------------------------|-----------------------------------|-----------------------------------|
-| ![Profile](screenshots/Profile.png) | ![Macros](screenshots/Macros.png) | ![Search](screenshots/Search.png) |
-
-| AddPost                             |  |  |
-|-------------------------------------|--|--|
-| ![AddPost](screenshots/AddPost.png) |  |  |
+| Profile | | |
+|---------|--|--|
+| ![Profile](screenshots/Profile.png) | | |
 
 ---
 
@@ -91,4 +87,4 @@ cd backend && npm start  # Backend API
 
 **Adrian Dallas** · B00902149  
 📧 [amccrea354@gmail.com](mailto:amccrea354@gmail.com)  
-🔗 [LinkedIn](#) | [Portfolio](#)
+🔗 [LinkedIn](https://www.linkedin.com/in/adriandallas1995/) | [Portfolio](#)

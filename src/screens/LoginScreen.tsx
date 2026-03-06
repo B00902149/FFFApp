@@ -139,7 +139,7 @@ export const LoginScreen = ({ navigation }: any) => {
       >
         {/* ── App Logo + Tagline ── */}
         <View style={styles.header}>
-          <Image source={require('../../assets/mainlogo.png')} style={styles.logo} resizeMode="cover" />
+          <Image source={require('../../assets/logo-white-full.png')} style={styles.logo} resizeMode="cover" />
           <Text style={styles.tagline}>One Hub. Infinite Possibilities.</Text>
         </View>
 

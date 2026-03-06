@@ -35,7 +35,7 @@ const NavBar = ({ navigation, activeTab }: { navigation: any; activeTab: 'search
   <View style={styles.topNav}>
     {/* App logo */}
     <Image
-      source={require('../../assets/logo.png')}
+      source={require('../../assets/logo-white-icon.png')}
       style={styles.logo}
       resizeMode="contain"
     />

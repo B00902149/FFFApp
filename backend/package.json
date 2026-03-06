@@ -20,6 +20,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.1.0",
     "mongoose": "^9.1.6",
+    "node.js": "^0.0.1-security",
     "nodemailer": "^8.0.1"
   },
   "devDependencies": {
